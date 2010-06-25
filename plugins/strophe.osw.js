@@ -74,10 +74,10 @@ $aclr.parse = function(node) {
 
 	$(node).xmlns( self.JQUERY_NAMESPACES, function() {
 		rule = {
-			'action': this.find("osw|acl-action").text(), 
+			'action': this.find("osw|acl-action").text() || null, 
 			'permission': this.find("osw|acl-action").attr("permission"),
 			'subjectType': this.find("osw|acl-subject").attr("type"),
-			'subject': this.find("osw|acl-subject").text(),
+			'subject': this.find("osw|acl-subject").text() || null,
 		}
 	}); 
 
