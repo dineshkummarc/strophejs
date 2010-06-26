@@ -401,11 +401,10 @@ Strophe = {
     {
         if (!name) { return null; }
 
-        var node = null;
+        var node = null, attrs = null, text = null;
         if (!Strophe._xmlGenerator) {
             Strophe._xmlGenerator = Strophe._makeGenerator();
         }
-        node = Strophe._xmlGenerator.createElement(name);
 
         // FIXME: this should throw errors if args are the wrong type or
         // there are more than two optional args
@@ -414,24 +413,43 @@ Strophe = {
             if (!arguments[a]) { continue; }
             if (typeof(arguments[a]) == "string" ||
                 typeof(arguments[a]) == "number") {
-                node.appendChild(Strophe.xmlTextNode(arguments[a]));
+                text = arguments[a];
             } else if (typeof(arguments[a]) == "object" &&
                        typeof(arguments[a].sort) == "function") {
+				attrs = {};
+
                 for (i = 0; i < arguments[a].length; i++) {
                     if (typeof(arguments[a][i]) == "object" &&
                         typeof(arguments[a][i].sort) == "function") {
-                        node.setAttribute(arguments[a][i][0],
-                                          arguments[a][i][1]);
+
+						attrs[ arguments[a][i][0] ] = arguments[a][i][1];
                     }
                 }
             } else if (typeof(arguments[a]) == "object") {
-                for (k in arguments[a]) {
-                    if (arguments[a].hasOwnProperty(k)) {
-                        node.setAttribute(k, arguments[a][k]);
-                    }
-                }
+                attrs = arguments[a];
             }
         }
+
+
+		// try to create the qname with a proper namespace if possible
+		if( attrs != null && attrs.hasOwnProperty('xmlns') && Strophe._xmlGenerator.createElementNS ) {
+			node = Strophe._xmlGenerator.createElementNS(attrs.xmlns, name);
+		// otherwise ignore it and create an element, and make xmlns an attr as normal.
+		} else {
+			node = Strophe._xmlGenerator.createElement(name);
+		}
+
+		if( text != null ) {
+			node.appendChild(Strophe.xmlTextNode(text));
+		}
+
+		if( attrs != null ) {
+			for(k in attrs) {
+		        if (attrs.hasOwnProperty(k)) {
+		            node.setAttribute(k, attrs[k]);
+		        }
+		    }
+		}
 
         return node;
     },
