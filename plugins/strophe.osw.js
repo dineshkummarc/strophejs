@@ -225,9 +225,60 @@ osw.util = {
 		do {
 			n = Math.floor( Math.random() * max ) + min;
 		} while( checkFn(n) );
-	}
+	},
 }
 
+
+
+
+/*
+Class: osw.util.logger
+
+	Returns a random number that is checked using user-supplied checkFn.
+
+*/
+
+osw.util.logger = {
+
+	/*
+	Function: debug
+
+	Parmateters:
+		msg - The message.
+
+	*/
+	debug: function(msg) {
+		if (typeof(console) !== 'undefined') {
+		console.debug(msg);
+		}
+	},
+
+	/*
+	Function: info
+
+	Parmateters:
+		msg - The message.
+
+	*/
+	info: function(msg) {
+		if (typeof(console) !== 'undefined') {
+		console.info(msg);
+		}
+	},
+
+	/*
+	Function: error
+
+	Parmateters:
+		msg - The message.
+
+	*/
+	error: function(msg) {
+		if (typeof(console) !== 'undefined') {
+		console.error(msg);
+		}
+	}
+}
 
 /*
 Class: osw.util.delegate
@@ -362,10 +413,7 @@ Strophe.addConnectionPlugin('osw', {
 	*/
 
 	init: function(conn) {
-		connection = conn;
-
-		// FIXME logger
-		logger = connection.logger
+		this._connection = conn;
 
 		$.each( osw.NS, function(k,v) {
 			Strophe.addNamespace( k, v );
@@ -413,7 +461,7 @@ Strophe.addConnectionPlugin('osw', {
 	activities: function(who){
 		// FIXME should !who get inbox() instead?
 
-		connection.pubsub.items( connection.jid, 
+		this._connection.pubsub.items( this._connection.jid, 
 			who, 
 			osw.NS.microblog, 
 			$.proxy(this._receivedActivities, this), 
@@ -451,7 +499,7 @@ Strophe.addConnectionPlugin('osw', {
 
 
 	publishActivity: function(status) {
-		var pubId = connection.getUniqueId("publishnode");
+		var pubId = this._connection.getUniqueId("publishnode");
 
 		var pubsubEl = $build('pubsub', {xmlns: osw.NS.pubsub})
 			.c('publish', {node: osw.NS.microblog})
@@ -484,7 +532,7 @@ Strophe.addConnectionPlugin('osw', {
 		//console.dirxml( iqEl );
 
 
-		connection.sendIQ( iqEl, function(iq) {
+		this._connection.sendIQ( iqEl, function(iq) {
 
 			//console.dirxml( iq );
 		},
@@ -503,16 +551,16 @@ Strophe.addConnectionPlugin('osw', {
      **/
     inbox : function() {
 		var sub = $iq({
-			'from' : connection.jid, 
+			'from' : this._connection.jid, 
 			'type' : 'get'
 		}).c('pubsub', {
 			'xmlns': osw.NS.pubsub 
 		}).c('items', {
 			'node' : 'http://onesocialweb.org/spec/1.0/inbox'
 		});
-		connection.sendIQ(sub.tree(), $.proxy(this._receivedInbox, this), function(st) {
-			logger.error('Unable to send IQ to receive activities');
-			logger.debug(st);
+		this._connection.sendIQ(sub.tree(), $.proxy(this._receivedInbox, this), function(st) {
+			osw.util.logger.error('Unable to send IQ to receive activities');
+			osw.util.logger.debug(st);
 		});
     },
 
@@ -537,8 +585,8 @@ Strophe.addConnectionPlugin('osw', {
 	 * 
 	 */
 	subscriptions : function() {
-		connection.sendIQ($iq({
-			'from': connection.jid, 
+		this._connection.sendIQ($iq({
+			'from': this._connection.jid, 
 			'type': 'get'
 		}).c('pubsub', { 
 			'xmlns': osw.NS.pubsub
@@ -565,16 +613,16 @@ Strophe.addConnectionPlugin('osw', {
      * callback - A function which is called when the 'follow' request is successful
      **/
     follow : function(jid, callback) {
-		logger.info('Requesting to follow: ' + jid)
+		osw.util.logger.info('Requesting to follow: ' + jid)
 
-		connection.pubsub.subscribe( jid, jid, null, OneSocialWeb.XMLNS.MICROBLOG, null, function(stanza) {
+		this._connection.pubsub.subscribe( jid, jid, null, OneSocialWeb.XMLNS.MICROBLOG, null, function(stanza) {
 			if($(stanza).attr('type') == 'result') {
-				logger.info("Subscribe request complete");
-				logger.debug(stanza);
+				osw.util.logger.info("Subscribe request complete");
+				osw.util.logger.debug(stanza);
 				callback();
 			} else {
-				logger.info("Subscribe request unsuccssful");
-				logger.debug(stanza);
+				osw.util.logger.info("Subscribe request unsuccssful");
+				osw.util.logger.debug(stanza);
 			}
 		});
     },
@@ -590,16 +638,16 @@ Strophe.addConnectionPlugin('osw', {
      * callback - A function which is called when the 'unfollow' request is successful
      **/
     unfollow : function(jid, callback) {
-		logger.info('Requesting to unfollow: ' + jid);
+		osw.util.logger.info('Requesting to unfollow: ' + jid);
 
-		connection.pubsub.unsubscribe( jid, jid, OneSocialWeb.XMLNS.MICROBLOG, function(stanza) {
+		this._connection.pubsub.unsubscribe( jid, jid, OneSocialWeb.XMLNS.MICROBLOG, function(stanza) {
 			if($(stanza).attr('type') == 'result') {
-				logger.info("Unsubscribe request complete");
-				logger.debug(stanza);
+				osw.util.logger.info("Unsubscribe request complete");
+				osw.util.logger.debug(stanza);
 				callback();
 			} else {
-				logger.info("Unsubscribe request unsuccssful");
-				logger.debug(stanza);
+				osw.util.logger.info("Unsubscribe request unsuccssful");
+				osw.util.logger.debug(stanza);
 			}
 		});
     },
@@ -614,9 +662,9 @@ Strophe.addConnectionPlugin('osw', {
      * jid - The Jabber identifier of the user to add
      **/
     add_contact : function(jid) {
-		logger.info('Adding contact ' + jid);
-		connection.roster.update(jid, jid, ['MyBuddies']);
-		connection.roster.subscribe(jid);      
+		osw.util.logger.info('Adding contact ' + jid);
+		this._connection.roster.update(jid, jid, ['MyBuddies']);
+		this._connection.roster.subscribe(jid);      
     },
 
     /**
@@ -629,8 +677,8 @@ Strophe.addConnectionPlugin('osw', {
      * jid - The Jabber identifier of the user requesting to be a contact
      **/
     confirm_contact : function(jid) {
-		connection.roster.update(jid, jid, ['MyBuddies']);
-		connection.roster.authorize(jid);    
+		this._connection.roster.update(jid, jid, ['MyBuddies']);
+		this._connection.roster.authorize(jid);    
     },
 
     /**
@@ -643,7 +691,7 @@ Strophe.addConnectionPlugin('osw', {
      * jid - The Jabber Identifier of the user you wish to request the VCARD
      **/
     vcard : function(jid) {
-		connection.sendIQ($iq({
+		this._connection.sendIQ($iq({
 			'type': 'get',
 			'to': jid,
 			'xmlns': OneSocialWeb.XMLNS.CLIENT
@@ -671,13 +719,13 @@ Strophe.addConnectionPlugin('osw', {
      * groups - A list of group names
      **/
     update_contact : function(jid, name, groups) {
-		connection.roster.update(jid, name, groups);
+		this._connection.roster.update(jid, name, groups);
     },
 
     edit_profile : function(nickname) {
-		connection.sendIQ($iq({
+		this._connection.sendIQ($iq({
 			'type': 'set',
-			'from': connection.jid,
+			'from': this._connection.jid,
 		}).c('pubsub', {
 			'xmlns': OneSocialWeb.SCHEMA.PUBSUB
 		}).c('publish', {
