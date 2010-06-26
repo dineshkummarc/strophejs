@@ -1,6 +1,7 @@
 // FIXME? I might not belong in this file.
 window.osw = {
 	'NS' : {
+		'xhtml' : 'http://www.w3.org/1999/xhtml',
 		'httpbind' : 'http://jabber.org/protocol/httpbind',
 		'client' : 'jabber:client',
 
@@ -28,10 +29,15 @@ osw.acl = {
     /*
 	Function: rule
       
-		Create an ACL rule and return the DOM element.
+		Create an ACL rule and return the DOM element. 
+
+		Note that the first
+		three parameters may be shorthand for the wanted constant, for example
+		'grant' is equivalent to osw.acl.permission.grant when passed as the 
+		first argument.
 
 	Parameters:
-		perm - A permission type from osw.acl.permission
+		perm - A permission type from osw.acl.permission.
 		action - An action from osw.acl.action
 		subjectType - A subjectType from osw.acl.subjectType
 		subject - A string description of the subject. Useful for group/user type.
@@ -41,10 +47,14 @@ osw.acl = {
     */
 
 	'rule' : function(perm, action, subjectType, subject) {
-		return $build('acl-rule', {xmlns: osw.NS.osw})
-			.c('acl-action', {permission: perm})
-				.t( action ).up()
-			.c('acl-subject', {type: subjectType}).t( subject ? subject : '' ).up()
+		// allow shorthand use of constants.
+		if(osw.acl.permission.hasOwnProperty(perm)) { perm = osw.acl.permission[perm]; }
+		if(osw.acl.action.hasOwnProperty(action)) { action = osw.acl.action[action]; }
+		if(osw.acl.subjectType.hasOwnProperty(subjectType)) { subjectType = osw.acl.subjectType[subjectType]; }
+
+		return $build('acl-rule', {'xmlns': osw.NS.osw})
+			.c('acl-action', {'xmlns': osw.NS.osw, 'permission': perm}).t( action ).up()
+			.c('acl-subject', {'xmlns': osw.NS.osw, 'type': subjectType}).t( subject || '' ).up()
 			.tree();
 	},
 
@@ -122,6 +132,93 @@ osw.acl = {
 }
 
 /*
+Class: osw.object
+
+	A class for creating and paring objects for activities.
+
+*/
+osw.object = {
+	/*
+		Function: create
+			Create an object of any known type and return a DOM node
+	*/
+	'create' : function(type, fields) {
+		var builder = $build('object', {xmlns: osw.NS.activity});
+
+		// TODO make modular
+		switch(type) {
+			case 'status':
+			case osw.object.type.status:
+				// this could include text/html and other formats. for now, just text.
+				var contentType = 'text/plain';
+
+				builder
+					.c('object-type', {'xmlns': osw.NS.activity})
+						.t(osw.object.type.status).up()
+					.c('content', {xmlns: osw.NS.atom,type: contentType})
+						.t( status ).up();
+				break;
+
+			case 'picture':
+			case osw.object.type.picture:
+				builder
+					.c('object-type', {'xmlns': osw.NS.activity})
+						.t(osw.object.type.picture).up()
+					.c('link', {'xmlns': osw.NS.xhtml, 'rel': 'alternate', 'href' : fields.picture}).up();
+				break;
+
+		}
+
+		return builder.tree();
+	},
+
+	/*
+		Function: picture
+
+			Short hand for creating a picture object
+
+	*/
+	'picture' : function(picture) {
+		return osw.object.create('picture', {'picture' : picture});
+	},
+
+	/*
+		Function: status
+
+			Short hand cor creating a status object
+	*/
+	'status' : function(status) {
+		return osw.object.create('status', {'status' : status});
+	},
+
+
+	/*
+		Function: parse
+			TODO
+
+	*/
+	'parse' : function(entryNode) {
+		// TODO take code from activity.parse and have that delegate to this.
+	},
+
+    /*
+	Constants: type
+      
+		Constants for subject types
+
+		type.status - A status message that may contain content of type text/plain
+		type.picture - A picture that may contain the URL of a picture node. 
+
+	*/
+
+	'type' : {
+		'status' : 'http://onesocialweb.org/spec/1.0/object/status',
+		'picture' : 'http://onesocialweb.org/spec/1.0/object/picture',
+	}
+
+}
+
+/*
 	Class: osw.activity
 
 		A class for parsing and eventually creating OSW activities.
@@ -194,7 +291,43 @@ osw.activity = {
 
 		return activity;
 
-	}
+	},
+
+	/*
+	Function: create
+		Create an activity that can be added to a publication or other node. It
+		creates it in the context of an ATOM entry node.
+
+	Parameters:
+		title - The title of the activity. This is generally the same as an appended 'status' object, but not necessary.
+		objects - An array of object DOM nodes created by osw.object.create.
+		rules - An array of acl rule DOM nodes created by osw.acl.rule.
+
+	Example:
+
+		An activity can have multiple objects and ACL rules. This example creates
+		a picture with a status caption, and allows everyone except enemies
+		to view it.
+
+		: osw.activity.create( 'Some Activity', [ osw.object.status('Some Activity'), osw.object.picture('http://example.com/picture.jpg' ], [ osw.acl.rule('grant', 'view', 'everyone'), osw.acl.rule('deny', view', 'enemies' ] );
+
+	*/
+
+	'create' : function(title, objects, rules) {
+		var builder = $build('entry', {'xmlns': osw.NS.atom})
+			.c('title').t( title ).up()
+			.c('verb', {'xmlns': osw.NS.activity}).t( 'http://activitystrea.ms/schema/1.0/post' ).up()
+
+		$.each(objects, function(i, obj)) {
+			builder.cnode( obj );
+		}
+
+		$.each(rules, function(i, rule)) {
+			builder.cnode( obj );
+		}
+
+		return builder.tree();
+	},
 }
 
 
@@ -488,51 +621,26 @@ Strophe.addConnectionPlugin('osw', {
 	/*
 	Function: publishActivity
 
-		Publish an activity. This is a very simple version that only pushes
-		status at the moment. It should be expanded to use a builder style
-		that supports the various object types in the future.
+		Publish an activity based on an ATOM entry node, created by 
+		osw.activity.create. See that method for detauls.
 
 	Parameters:
 
-		status - A string status update.
+		entryNode - An entry node created by osw.activity.create
 	*/
 
 
-	publishActivity: function(status) {
+	publishActivity: function( entryNode ) {
 		var pubId = this._connection.getUniqueId("publishnode");
 
-		var pubsubEl = $build('pubsub', {xmlns: osw.NS.pubsub})
-			.c('publish', {node: osw.NS.microblog})
-				.c('item')
-					.c('entry', {xmlns: osw.NS.atom, 'xmlns:activity' : osw.NS.activity})
-						.c('title').t( status ).up()
-						.c('activity:verb').t( 'http://activitystrea.ms/schema/1.0/post' ).up()
-						.c('object', {xmlns: osw.NS.activity})
-							.c('object-type').t('http://onesocialweb.org/spec/1.0/object/status').up()
-							.c('content', {xmlns: osw.NS.atom,type: 'text/plain'}).t( status ).up().up()
-						/*.cnode(osw.acl.rule(
-							osw.acl.permission.grant,
-							osw.acl.action.view,
-							osw.acl.subjectType.group,
-							'friends'
-						))*/
-						.cnode(osw.acl.rule(
-							osw.acl.permission.grant,
-							osw.acl.action.view,
-							osw.acl.subjectType.everyone
-						))
+		var iq = $iq({type:'set', id: pubId})
+				.c('pubsub', {xmlns: osw.NS.pubsub})
+					.c('publish', {node: osw.NS.microblog})
+						.c('item')
+							.cnode( entryNode )
 			.tree();
 
-		var iqEl = $iq({
-				type:'set', 
-				id: pubId
-			}).cnode( pubsubEl )
-			.tree();
-
-		//console.dirxml( iqEl );
-
-
-		this._connection.sendIQ( iqEl, function(iq) {
+		this._connection.sendIQ( iq, function(iq) {
 
 			//console.dirxml( iq );
 		},
@@ -543,6 +651,7 @@ Strophe.addConnectionPlugin('osw', {
 		});
 
 	},
+
 
     /**
      * Function: inbox
