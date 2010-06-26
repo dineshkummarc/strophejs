@@ -401,7 +401,7 @@ Strophe = {
     {
         if (!name) { return null; }
 
-        var node = null, attrs = null, text = null;
+        var node = null, attrs = {}, text = null;
         if (!Strophe._xmlGenerator) {
             Strophe._xmlGenerator = Strophe._makeGenerator();
         }
@@ -431,9 +431,64 @@ Strophe = {
         }
 
 
-		// try to create the qname with a proper namespace if possible
-		if( attrs != null && attrs.hasOwnProperty('xmlns') && Strophe._xmlGenerator.createElementNS ) {
+		var ns = {}, attrsNS = [], elemNS = null;
+		// if we support proper namespaces then try to use them
+		if( attrs != null && Strophe._xmlGenerator.createElementNS ) {
+
+			// calculate namspaces			
+			for(var attr in attrs) {
+				// default namespace
+				if(attr == 'xmlns') {
+					ns[''] = attrs[attr];
+
+					//delete attrs[attr];
+
+				// namespace for things with xmlns: prefix
+				} else if(attr.substr(0, 6) == 'xmlns:') {
+					var parts = attrs.split(':', 2);
+					ns[ parts[0] ] = attrs[ attr ]; 
+
+					//delete attrs[attr];
+				}
+			}
+
+			// find attributes that should be namespaced, and delete 
+			// from original hash.
+			for(var attr in attrs) {
+				if(attrs.indexOf(':') > 0) {
+					var parts = attrs.split(':', 2);
+
+					if( ns.hasOwnProperty( parts[0] ) {
+						attrsNS.push({
+							'ns': ns[ parts[0] ],
+							'name' : attr,
+							'value' : attrs[ attr ]
+						});
+
+						delete attrs[ attr ];
+					}
+				}
+			}
+
+			// find element NS
+
+			// prefixed element?
+			if(name.indexOf(':') > 0) {
+				var parts = name.split(':', 2);
+
+				if( ns.hasOwnProperty( parts[0] ) ) {
+					elemNS = ns[ parts[0] ];
+				}
+
+			// default namespace?
+			} else if( ns.hasOwnProperty('') ) {
+				elemNS = ns[''];
+			}
+
+
+		
 			node = Strophe._xmlGenerator.createElementNS(attrs.xmlns, name);
+
 		// otherwise ignore it and create an element, and make xmlns an attr as normal.
 		} else {
 			node = Strophe._xmlGenerator.createElement(name);
@@ -443,13 +498,20 @@ Strophe = {
 			node.appendChild(Strophe.xmlTextNode(text));
 		}
 
-		if( attrs != null ) {
-			for(k in attrs) {
-		        if (attrs.hasOwnProperty(k)) {
-		            node.setAttribute(k, attrs[k]);
-		        }
-		    }
-		}
+
+		for(k in attrs) {
+	        if (attrs.hasOwnProperty(k)) {
+	            node.setAttribute(k, attrs[k]);
+	        }
+	    }
+
+		for(i = 0; i < attrsNS.length; i++) {
+			var attr = attrsNS[i];
+
+	        node.setAttributeNS(attr.ns, attr.name, attr.value);
+	    }
+
+		
 
         return node;
     },
