@@ -446,7 +446,7 @@ Strophe = {
 				// namespace for things with xmlns: prefix
 				} else if(attr.substr(0, 6) == 'xmlns:') {
 					var parts = attrs.split(':', 2);
-					ns[ parts[0] ] = attrs[ attr ]; 
+					ns[ parts[1] ] = attrs[ attr ]; 
 
 					//delete attrs[attr];
 				}
@@ -455,13 +455,13 @@ Strophe = {
 			// find attributes that should be namespaced, and delete 
 			// from original hash.
 			for(var attr in attrs) {
-				if(attrs.indexOf(':') > 0) {
-					var parts = attrs.split(':', 2);
+				if(attr.indexOf(':') > 0) {
+					var parts = attr.split(':', 2);
 
-					if( ns.hasOwnProperty( parts[0] ) {
+					if( ns.hasOwnProperty( parts[0] ) ) {
 						attrsNS.push({
 							'ns': ns[ parts[0] ],
-							'name' : attr,
+							'name' : parts[1], // attr,
 							'value' : attrs[ attr ]
 						});
 
@@ -487,7 +487,11 @@ Strophe = {
 
 
 		
-			node = Strophe._xmlGenerator.createElementNS(attrs.xmlns, name);
+			if( elemNS ) {
+				node = Strophe._xmlGenerator.createElementNS(elemNS, name);
+			} else {
+				node = Strophe._xmlGenerator.createElement(name);
+			}
 
 		// otherwise ignore it and create an element, and make xmlns an attr as normal.
 		} else {
