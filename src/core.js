@@ -445,7 +445,7 @@ Strophe = {
 
 				// namespace for things with xmlns: prefix
 				} else if(attr.substr(0, 6) == 'xmlns:') {
-					var parts = attrs.split(':', 2);
+					var parts = attr.split(':', 2);
 					ns[ parts[1] ] = attrs[ attr ]; 
 
 					//delete attrs[attr];
