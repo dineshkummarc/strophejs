@@ -57,7 +57,7 @@ function jackTest(name, fun) {
         );
 }
 
-jackTest("roster.get() should send IQ",
+jackTest("roster.fetch() should send IQ",
          function (mockConnection) {
              jack.expect("mockConnection.sendIQ")
                  .once();
@@ -75,13 +75,14 @@ jackTest("roster.get() should callback with empty array",
                      }
                  );
              rosterPlugin.init(mockConnection);
-             rosterPlugin.fetch(
-                 function(items) {
-                     called++;
-                     equals(items.length, 0, "items must be empty");
-                 }
-             );
-             equals(called, 1, "roster.get() callback should be called");
+	     rosterPlugin.set_callbacks({
+		 presence_changed: function() {
+		     console.debug("BOOM " + called);
+		     called ++;
+		 }
+	     });
+             rosterPlugin.fetch();
+             equals(called, 0, "roster.get() callback should be called");
          });
 /**
  *  Test stanza came from RFC 3921 XMPP-IM
@@ -111,19 +112,21 @@ jackTest("roster.get() should callback with roster items",
                      }
                  );
              rosterPlugin.init(mockConnection);
-             rosterPlugin.fetch(
-                 function(items) {
-                     called++;
+	     rosterPlugin.set_callbacks({
+		 presence_changed: function(contact) {
+		     called++;
+		     if (called == 1) {
                      equals(null, rosterPlugin.ver);
-                     equals(items.length, 3, "3 items");
-                     equals(Strophe._connectionPlugins["roster"].items.length, 3, "3 items");
-                     equals(items[0].name, "Romeo");
-                     equals(items[0].jid, "romeo@example.net");
-                     equals(items[0].subscription, "both");
-                     equals(items[0].groups.length, 1);
-                     equals(items[0].groups[0], 'Friends');
-                 });
-             equals(called, 1, "roster.get() callback should be called");
+                     equals(contact.name, "Romeo");
+                     equals(contact.jid, "romeo@example.net");
+                     equals(contact.subscription, "both");
+                     equals(contact.groups.length, 1);
+                     equals(contact.groups[0], 'Friends');
+		     }
+		 }
+	     });
+             rosterPlugin.fetch();
+             equals(called, 3, "roster.fetch() callback should be called");
          });
 
 function getFeatures(rosterver)
@@ -135,14 +138,14 @@ jackTest("roster plugin say if roster versioning is enabled",
         function(mockConnection) {
             mockConnection.features = getFeatures(true);
             rosterPlugin.init(mockConnection);
-            equals(true, rosterPlugin.supportVersioning(), "roster versioning should be enabled");
+            equals(true, rosterPlugin.supports_versioning(), "roster versioning should be enabled");
         });
 
 jackTest("roster plugin say if roster versioning is not enabled",
         function(mockConnection) {
             mockConnection.features = getFeatures(false);
             rosterPlugin.init(mockConnection);
-            equals(false, rosterPlugin.supportVersioning(), "roster versioning should be enabled");
+            equals(false, rosterPlugin.supports_versioning(), "roster versioning should be enabled");
         });
 
 jackTest("roster.get() send ver if server support versioning",

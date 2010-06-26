@@ -5,7 +5,7 @@ Modified by Owen Griffin
 
 (function() {
     Strophe.addConnectionPlugin('roster', (function() {
-	var that, init, connection, callbacks, version, logger, contacts, on_presence, on_iq, get_contact, parse_query, parse_contact, fetch, subscribe, unsubscribe, authorize, unauthorize, update_contact, set_callbacks;
+	var that, init, connection, callbacks, version, logger, contacts, on_presence, on_iq, get_contact, parse_query, parse_contact, fetch, subscribe, unsubscribe, authorize, unauthorize, update_contact, set_callbacks, supports_versioning;
 
 	// A logger which uses the Firebug 'console'
 	logger =  {
@@ -281,6 +281,14 @@ Modified by Owen Griffin
             connection.send($pres({to: jid, type: "unsubscribed"}));
 	};
 
+	/** 
+	 * Function: supportVersioning
+	 * return true if roster versioning is enabled on server
+	 */
+	supports_versioning = function() {
+            return (connection.features && connection.features.getElementsByTagName('ver').length > 0);
+	}
+
 	that = {};
 	that.init = init;
 	that.set_callbacks = set_callbacks;
@@ -291,6 +299,7 @@ Modified by Owen Griffin
 	that.unsubscribe = unsubscribe;
 	that.subscribe = subscribe;
 	that.update_contact = update_contact;
+	that.supports_versioning = supports_versioning;
 	return that;
     }()))
 }());
