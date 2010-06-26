@@ -261,7 +261,7 @@ jackTest("roster should be filled when received iq and send reply ",
 jackTest("roster should be updated when received iq and update callback called",
          function(mockConnection) {
              var callbackIq = null;
-             var called = 0;
+             var called = 0, calledWithItem = 0;
              jack.expect("mockConnection.addHandler")
                  .exactly("2 time").mock(
                      function(callback, ns, type) {
@@ -281,9 +281,12 @@ jackTest("roster should be updated when received iq and update callback called",
                      });
              rosterPlugin.init(mockConnection);
              rosterPlugin.registerCallback(
-                 function(items) {
+                 function(items, item) {
                      called++;
                      equals(1, items.length);
+                     if( item ) {
+                     	calledWithItem++;
+                     }
                  });
              rosterPlugin.get(function() {});
              ok(callbackIq(toDom('<iq type="set"><query xmlns="jabber:iq:roster">'
@@ -293,8 +296,9 @@ jackTest("roster should be updated when received iq and update callback called",
                            + '<group>Friends</group>'
                            + '</item></query></iq>')), "handler should return true"); equals(rosterPlugin.items.length, 1);
              equals("both", rosterPlugin.items[0].subscription);
-             equals(called, 2);
-             expect(6);
+             equals(called, 4);
+			 equals(calledWithItem, 2);
+             expect(9);
          }
         );
 

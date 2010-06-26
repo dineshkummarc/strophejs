@@ -292,13 +292,15 @@ Strophe.addConnectionPlugin('roster',
         var item = this.findItem(jid);
         if (!item)
         {
-            this.items.push({
+			item = {
                 name         : name,
                 jid          : jid,
                 subscription : subscription,
                 groups       : groups,
                 resources    : {}
-            });
+            };
+
+            this.items.push(item);
         }
         else
         {
@@ -306,5 +308,6 @@ Strophe.addConnectionPlugin('roster',
             item.subscription = subscription;
             item.group = groups;
         }
+		this._call_backs( this.items, item );
     }
 });
