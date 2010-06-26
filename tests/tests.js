@@ -123,6 +123,54 @@ $(document).ready(function () {
         equals(elem.tagName, "message", "Element name should be the same");
     });
 
+
+    test("XML element creation with default namespace", function () {
+        var elem = Strophe.xmlElement("message", {"xmlns": "http://example.com/ns"});
+
+        equals(elem.tagName, "message", "Element name should be the same");
+		equals(elem.namespaceURI, "http://example.com/ns", "DOM namespaec should be set");
+		equals(elem.hasAttribute("xmlns"), true, "Element should contain xmlns attribute");
+		equals(elem.getAttribute("xmlns"), "http://example.com/ns", "xmlns attribute should be correct");
+    });
+
+	test("XML element creation with prefixed namespace", function () {
+        var elem = Strophe.xmlElement("myns:message", {"xmlns:myns": "http://example.com/ns"});
+
+        equals(elem.tagName, "myns:message", "Element name should be the same");
+		equals(elem.localName, "message", "Element should have correct localName");
+		equals(elem.prefix, "myns", "Element should have correct prefix");
+		equals(elem.namespaceURI, "http://example.com/ns", "DOM namespaec should be set");
+		equals(elem.hasAttribute("xmlns:myns"), true, "Element should contain xmlns attribute");
+		equals(elem.getAttribute("xmlns:myns"), "http://example.com/ns", "xmlns attribute should be correct");
+    });
+
+	test("XML element creation with prefixed attributes", function () {
+        var elem = Strophe.xmlElement("message", {"xmlns:myns": "http://example.com/ns", "myns:someattr" : "namespaced attribute"});
+
+		equals(elem.hasAttribute("xmlns:myns"), true, "Element should contain xmlns attribute");
+		equals(elem.getAttribute("xmlns:myns"), "http://example.com/ns", "xmlns attribute should be correct");
+
+		equals(elem.hasAttributeNS("http://example.com/ns", "someattr"), true, "Element should have namespaced attribute");
+		equals(elem.getAttributeNS("http://example.com/ns", "someattr"), "namespaced attribute", "Namespaced attribute should have correct value");
+
+		equals(elem.hasAttribute("myns:someattr"), false, "Element should not have prefixed attribute in default namespace");
+    });
+
+	test("XML element creation with invalid prefixed namespace", function () {
+        var elem = Strophe.xmlElement("myns:message");
+
+        equals(elem.tagName, "myns:message", "Element name should be the same");
+		equals(elem.localName, "myns:message", "Element should have a localName");
+		equals(elem.prefix, null, "Element should not have a prefix");
+		equals(elem.namespaceURI, null, "DOM namespace should not be set");
+    });
+
+	test("XML element creation with invalid prefixed attributes", function () {
+        var elem = Strophe.xmlElement("message", {"myns:someattr" : "namespaced attribute"});
+
+		equals(elem.hasAttribute("myns:someattr"), true, "Element should have prefixed attribute in default namespace");
+    });
+
     module("Handler");
 
     test("Full JID matching", function () {
