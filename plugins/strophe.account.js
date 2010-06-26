@@ -6,7 +6,7 @@
 (function() {
     Strophe.addConnectionPlugin('account', (function() {
 
-	var that, init, register, connection, logger;
+	var that, init, register, connection, connection_callback, set_connection_callbacks, callbacks, logger;
 
 	// A logger which uses the Firebug 'console'
 	logger =  {
@@ -28,12 +28,101 @@
 	};
 
 	/**
+	 * Group: callbacks
+	 */
+	callbacks = {};
+	/**
+	 * Callback: connection_failed
+	 *
+	 * Invoked when the connection to the server fails
+	 */
+	callbacks.connection_failed = function() {};
+	/**
+	 * Callback: connection
+	 * 
+	 * Invoked whenever the connection status changes
+	 */
+	callbacks.connection = function() {};
+	/**
+	 * Callback: connected
+	 *
+	 * Invoked when the connection is successful
+	 */
+	callbacks.connected = function() {};
+
+	/**
+	 * Group: Functions
+	 */
+
+	/**
 	 * Function: init
 	 *
 	 * Constructor used by the Strophe plugin framework.
 	 */
 	init = function(conn) {
 	    connection = conn;	    
+	};
+
+	/**
+	 * Function: set_connection_callbacks
+	 * 
+	 * Overrides the default connection callbacks if they are specified.
+	 */
+	set_connection_callbacks = function(callbks) {
+	    if (typeof(callbks) !== 'undefined') {
+		if (typeof(callbks.connection) !== 'undefined') {
+		    logger.info("Overriding connection callback");
+		    callbacks.connection = callbks.connection;
+		}
+		if (typeof(callbks.connection_failed) !== 'undefined') {
+		    logger.info("Overriding connection_failed callback");
+		    callbacks.connection_failed = callbks.connection_failed;
+		}
+		if (typeof(callbks.connected) !== 'undefined') {
+		    logger.info("Overriding connected callback");
+		    callbacks.connected = callbks.connected;
+		}
+	    }
+	};
+
+	/**
+	 * PrivateFunction: connection_callback
+	 *
+	 * Callback which is invoked during the connection to the server whenever
+	 * authenticating or registering.
+	 */
+	connection_callback = function(status) {
+	    var st;	    
+	    if (status === Strophe.Status.CONNECTED) {
+		logger.info("Invoking connected callback");
+		callbacks.connected();
+	    } else if (status === Strophe.Status.CONNFAIL) {
+		logger.info("Invoking connection_failed callback");
+		callbacks.connection_failed();
+	    } else {
+		for (st in Strophe.Status) {
+		    if (Strophe.Status[st] === status) {
+			logger.info("Invoking connection callback");
+			callbacks.connection(st);
+		    }
+		}
+	    }
+	}
+
+	/** 
+	 * Function: authenticate
+	 * 
+	 * Authenticates with a OneSocialWeb server using the specified credentials.
+	 * 
+	 * Parameters:
+	 * 
+	 * username - XMPP username
+	 * domain - Domain of the XMPP server
+	 * password - Plain text password of the XMPP username
+	 **/
+	authenticate = function(username, domain, password) {
+	    logger.info('Connecting with username ' + username);
+	    connection.connect(username, domain, password, connection_callback);
 	};
 
 	/**
@@ -45,41 +134,24 @@
 	 * username - The desired username
 	 * domain - The domain of the server
 	 * email - The email address of the desired user
-	 * callbacks - A hash containing functions which are called
-	 *
-	 * Group: Callbacks
+	 * callbacks - Callbacks for connection events, success and failure
 	 * callbacks.success - Function to invoke when registration has been successful
 	 * callbacks.error - Function to invoke when registration fails
-	 * callbacks.connection - Function which is invoked whenever the connection status changes
-	 * callbacks.connection_failed - Function which is invoked when the connection to the server fails
-	 * callbacks.connected - Function which is invoked when the connection is successful	 
+ 
 	 */
 	register = function(username,
 			    domain, 
 			    password, 
 			    email_address, 
-			    callbacks) {
+			    callbks) {
 	    
 	    var iq;
+
+	    set_connection_callbacks(callbks);
 	    
 	    // Tell Strophe to initiate a connection. This only appears to have the purpose
 	    // of setting the domain. There must be a better way of doing this.
-	    connection.connect('', domain, '', function() {
-		var st;
-		for (st in Strophe.Status) {
-		    if (Strophe.Status[st] === status) {
-			callbacks.connection(st);
-		    }
-		}
-		if (status === Strophe.Status.CONNECTED) {
-		    callbacks.connected();
-		} else if (status === Strophe.Status.CONNFAIL) {
-		    callbacks.connection_failed();
-		} else {
-		    logger.error(error);
-		    logger.debug(status);
-		}
-	    });
+	    connection.connect('', domain, '', connection_callback);
 	    
 	    logger.info('Attempting to register with: ' + username + ', ' + password + ', ' + email_address);
 	    iq = $iq({'type':'set'})
@@ -103,6 +175,8 @@
 	that = {};
 	that.init = init;
 	that.register = register;
+	that.authenticate = authenticate;
+	that.set_connection_callbacks = set_connection_callbacks;
 	return that;
     }()))
 }());
