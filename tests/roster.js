@@ -62,7 +62,7 @@ jackTest("roster.get() should send IQ",
              jack.expect("mockConnection.sendIQ")
                  .once();
              rosterPlugin.init(mockConnection);
-             rosterPlugin.get("callback");
+             rosterPlugin.fetch("callback");
          });
 
 jackTest("roster.get() should callback with empty array",
@@ -75,7 +75,7 @@ jackTest("roster.get() should callback with empty array",
                      }
                  );
              rosterPlugin.init(mockConnection);
-             rosterPlugin.get(
+             rosterPlugin.fetch(
                  function(items) {
                      called++;
                      equals(items.length, 0, "items must be empty");
@@ -111,7 +111,7 @@ jackTest("roster.get() should callback with roster items",
                      }
                  );
              rosterPlugin.init(mockConnection);
-             rosterPlugin.get(
+             rosterPlugin.fetch(
                  function(items) {
                      called++;
                      equals(null, rosterPlugin.ver);
@@ -157,7 +157,7 @@ jackTest("roster.get() send ver if server support versioning",
                  );
              mockConnection.features = getFeatures(true);
              rosterPlugin.init(mockConnection);
-             rosterPlugin.get(
+             rosterPlugin.fetch(
                  function(items) {
                      called++;
                      equals(0, items.length);
@@ -177,7 +177,7 @@ jackTest("roster.get() send specified ver if server support versioning",
                  );
              mockConnection.features = getFeatures(true);
              rosterPlugin.init(mockConnection);
-             rosterPlugin.get(
+             rosterPlugin.fetch(
                  function(items) {
                      called++;
                      equals(1, items.length);
@@ -196,7 +196,7 @@ jackTest("roster.get() accept ver and item arg and server return entire roster",
                  );
              mockConnection.features = getFeatures(true);
              rosterPlugin.init(mockConnection);
-             rosterPlugin.get(
+             rosterPlugin.fetch(
                  function(items) {
                      called++;
                      equals(items.length, 1);
@@ -285,7 +285,7 @@ jackTest("roster should be updated when received iq and update callback called",
                      called++;
                      equals(1, items.length);
                  });
-             rosterPlugin.get(function() {});
+             rosterPlugin.fetch(function() {});
              ok(callbackIq(toDom('<iq type="set"><query xmlns="jabber:iq:roster">'
                            + '<item jid="romeo@example.net" '
                            + 'name="Romeo" '
@@ -320,7 +320,7 @@ jackTest("roster should be handle presence of roster contact and update callback
                                          + '</item></query></iq>'));
                      });
              rosterPlugin.init(mockConnection);
-             rosterPlugin.get(function() {});
+             rosterPlugin.fetch(function() {});
              var called = 0;
              rosterPlugin.registerCallback(
                  function(items, item) {
@@ -361,7 +361,7 @@ jackTest("roster should be handle presence unavailable",
                                          + '</item></query></iq>'));
                      });
              rosterPlugin.init(mockConnection);
-             rosterPlugin.get(function() {});
+             rosterPlugin.fetch(function() {});
              same({}, rosterPlugin.items[0].resources);
              ok(callbackPresence(toDom('<presence from="romeo@example.net/orchard"><show>xa</show><status>Test</status><priority>42</priority></presence>')), "handler should return true");
              equals(rosterPlugin.items[0].resources['orchard'].show, "xa");
