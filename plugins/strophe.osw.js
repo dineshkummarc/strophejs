@@ -156,7 +156,7 @@ osw.object = {
 					.c('object-type', {'xmlns': osw.NS.activity})
 						.t(osw.object.type.status).up()
 					.c('content', {xmlns: osw.NS.atom,type: contentType})
-						.t( status ).up();
+						.t( fields.status ).up();
 				break;
 
 			case 'picture':
@@ -198,7 +198,27 @@ osw.object = {
 
 	*/
 	'parse' : function(entryNode) {
-		// TODO take code from activity.parse and have that delegate to this.
+		var obj;
+		$(entryNode).xmlns( osw.NS, function() {
+			obj = {
+				'id': this.find("id").text(),
+				'published': this.find("atom|published").text(),
+				'objectType': this.find("activity|object-type").text()
+			}; 
+
+			// TODO make modular
+			switch(obj.objectType) {
+				case osw.object.type.status:
+					obj.status = $(this).find("atom|content").text();
+					break;
+
+				case osw.object.type.picture:
+					obj.picture = $(this).find("html|link[rel='alternate']").attr("href");
+					break;
+			}
+		});
+
+		return obj;
 	},
 
     /*
@@ -267,24 +287,7 @@ osw.activity = {
 					}),
 
 					'objects' : this.find("activity|object").map(function() { 
-						var obj = {
-							'id': $(this).find("id").text(),
-							'published': $(this).find("atom|published").text(),
-							'objectType': $(this).find("activity|object-type").text()
-						}; 
-
-						// TODO make modular
-						switch(obj.objectType) {
-							case 'http://onesocialweb.org/spec/1.0/object/status':
-								obj.status = $(this).find("atom|content").text();
-								break;
-
-							case 'http://onesocialweb.org/spec/1.0/object/picture':
-								obj.picture = $(this).find("html|link[rel='alternate']").attr("href");
-								break;
-						}
-
-						return obj;
+						return osw.object.parse( this );
 					}),
 				};
 		});
@@ -316,15 +319,15 @@ osw.activity = {
 	'create' : function(title, objects, rules) {
 		var builder = $build('entry', {'xmlns': osw.NS.atom})
 			.c('title').t( title ).up()
-			.c('verb', {'xmlns': osw.NS.activity}).t( 'http://activitystrea.ms/schema/1.0/post' ).up()
+			.c('verb', {'xmlns': osw.NS.activity}).t( 'http://activitystrea.ms/schema/1.0/post' ).up();
 
-		$.each(objects, function(i, obj)) {
-			builder.cnode( obj );
-		}
+		$.each(objects || [], function(i, obj) {
+			builder.cnode( obj ).up();
+		});
 
-		$.each(rules, function(i, rule)) {
-			builder.cnode( obj );
-		}
+		$.each(rules || [], function(i, rule) {
+			builder.cnode( rule ).up();
+		});
 
 		return builder.tree();
 	},
