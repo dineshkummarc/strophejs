@@ -1,6 +1,61 @@
-/**
- * Modeled after roster.js
- */
+
+
+module("Osw.Acl");
+
+
+test("Created rule has correct elements, attributes, and namespace", function() {
+	var rule = osw.acl.rule('grant', 'view', 'group', 'friends');
+	$(rule).xmlns( osw.NS, function() {
+		// acl-rule node
+		equals(this.length, 1, "Has element");
+		var node = this.get(0);
+		equals(node.localName, 'acl-rule', 'Element has correct localName');
+		equals(node.namespaceURI, osw.NS.osw, 'Element has correct namespace');
+		equals(node.childNodes.length, 2, 'Element has correct # of children');
+		
+		// acl-action child
+		var action = this.find("osw|acl-action");
+		equals(action.text(), osw.acl.action.view, "Action element has correct text");
+		equals(action.attr('permission'), osw.acl.permission.grant, "Action element has correct permission attribute");
+
+		// acl-subject child
+		var subject = this.find("osw|acl-subject");
+		equals(subject.text(), 'friends', "Subject element has correct text");
+		equals(subject.attr('type'), osw.acl.subjectType.group, "Subject element has correct type attribute");
+	});
+});
+
+test("Parsing rule returns correct values - with subject", function() {
+	var rule = osw.acl.parse( toDom('<acl-rule xmlns="http://onesocialweb.org/spec/1.0/"><acl-action permission="http://onesocialweb.org/spec/1.0/acl/permission/grant">http://onesocialweb.org/spec/1.0/acl/action/view</acl-action><acl-subject type="http://onesocialweb.org/spec/1.0/acl/subject/group">friends</acl-subject></acl-rule>') );
+
+	equals( rule.action, osw.acl.action.view, "Action" );
+	equals( rule.permission, osw.acl.permission.grant, "Permission" );
+	equals( rule.subjectType, osw.acl.subjectType.group, "Subject Type" );
+	equals( rule.subject, 'friends', "Subject" );
+});
+
+test("Parsing rule returns correct values - without subject", function() {
+	var rule = osw.acl.parse( toDom('<acl-rule xmlns="http://onesocialweb.org/spec/1.0/"><acl-action permission="http://onesocialweb.org/spec/1.0/acl/permission/grant">http://onesocialweb.org/spec/1.0/acl/action/view</acl-action><acl-subject type="http://onesocialweb.org/spec/1.0/acl/subject/everyone"></acl-subject></acl-rule>') );
+
+	equals( rule.action, osw.acl.action.view, "Action" );
+	equals( rule.permission, osw.acl.permission.grant, "Permission" );
+	equals( rule.subjectType, osw.acl.subjectType.everyone, "Subject Type" );
+	equals( rule.subject, null, "Subject is null" );
+});
+
+
+module("Osw.Object");
+
+// TODO finish me... I'm boring.
+
+test("Created object has correct elements, attributes, and namespace", function() {
+	var object = osw.object.create('Title here');
+
+	
+
+
+});
+
 
 var oswPlugin = Strophe._connectionPlugins["osw"];
 module("plugins.Osw", {
