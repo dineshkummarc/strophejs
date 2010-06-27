@@ -124,6 +124,8 @@ $(document).ready(function () {
     });
 
 
+	module("XML - Namespaces");
+
     test("XML element creation with default namespace", function () {
         var elem = Strophe.xmlElement("message", {"xmlns": "http://example.com/ns"});
 
