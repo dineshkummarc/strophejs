@@ -86,6 +86,17 @@ Modified by Owen Griffin
 	 *
 	 * Parameters:
 	 * jid - The Jabber identifier of the contact
+	 *
+	 * Returns: 
+	 * {
+	 *   jid: '',
+	 *   resources: [],
+	 *   nickname: '',
+	 *   avatar: {
+	 *     url: '',
+	 *     data: ''
+         *   }
+	 * }
 	 */
 	get_contact = function(jid) {
 	    var index; 
@@ -333,6 +344,7 @@ Modified by Owen Griffin
 	that.subscribe = subscribe;
 	that.update_contact = update_contact;
 	that.supports_versioning = supports_versioning;
+	that.callbacks = callbacks;
 	return that;
     }()))
 }());
