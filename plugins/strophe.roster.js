@@ -5,13 +5,14 @@ Modified by Owen Griffin
 
 (function() {
     Strophe.addConnectionPlugin('roster', (function() {
-	var that, init, connection, callbacks, version, logger, contacts, on_presence, on_iq, get_contact, parse_query, parse_contact, fetch, subscribe, unsubscribe, authorize, unauthorize, update_contact, set_callbacks, supports_versioning;
+	var that, init, connection, callbacks, version, logger, contacts, on_presence, on_iq, on_message, get_contact, parse_query, parse_contact, fetch, subscribe, unsubscribe, authorize, unauthorize, update_contact, set_callbacks, supports_versioning;
 
 	// A logger which uses the Firebug 'console'
 	logger =  {
 	    debug: function(msg) {
 		if (typeof(console) !== 'undefined') {
-		    console.debug('strophe.roster: ' + msg);
+		    console.debug('strophe.roster: ');
+		    console.debug(msg);
 		}
 	    },
 	    info: function(msg) {
@@ -46,6 +47,13 @@ Modified by Owen Griffin
 	callbacks.presence_changed = function(contact) {};
 
 	/**
+	 * Callback: contact_changed
+	 * 
+	 * Invoked when a contact has their details changed and needs to be re-drawn
+	 */
+	callbacks.contact_changed = function(contact) {};
+
+	/**
 	 * Group: Functions
 	 */
 
@@ -63,6 +71,10 @@ Modified by Owen Griffin
 		if (typeof(callbks.presence_changed) !== 'undefined') {
 		    logger.info("Overriding presence_changed callback");
 		    callbacks.presence_changed = callbks.presence_changed;
+		}
+		if (typeof(callbks.contact_changed) !== 'undefined') {
+		    logger.info("Overriding contact_changed callback");
+		    callbacks.contact_changed = callbks.contact_changed;
 		}
 	    }
 	};
@@ -129,6 +141,26 @@ Modified by Owen Griffin
 	};
 
 	/**
+	 * PrivateFunction: on_message
+	 *
+	 * Strophe callback invoked on a 'message' stanza.
+	 */
+	on_message = function(stanza) {
+	    var jid, contact, nick, nickname;
+	    jid = stanza.getAttribute('from');
+	    contact = connection.roster.get_contact(jid);
+	    if (contact) {
+		nick = stanza.getElementsByTagName('nick');
+		if (nick.length === 1) {
+		    contact.nickname = Strophe.getText(nick[0]);
+		    logger.info("Invoking contact_changed callback");
+		    callbacks.contact_changed(contact);
+		} 
+	    }
+	    return true;
+	};
+
+	/**
 	 * PrivateFunction: parse_query
 
 	 */
@@ -187,6 +219,7 @@ Modified by Owen Griffin
 	    // Bind to event handlers
 	    connection.addHandler(on_presence, null, 'presence', null, null, null);
             connection.addHandler(on_iq, Strophe.NS.ROSTER, 'iq', "set", null, null);
+	    connection.addHandler(on_message, null, 'message', null, null, null);
 
             Strophe.addNamespace('ROSTER_VER', 'urn:xmpp:features:rosterver');
 	};
