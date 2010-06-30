@@ -3,7 +3,7 @@
 */
 (function() {
     Strophe.addConnectionPlugin('vcard', (function() {
-	var that, init, connection, callbacks, logger, on_presence, on_message, on_iq, fetch;
+	var that, init, connection, callbacks, logger, on_presence, on_message, on_iq, fetch, save;
 
 	// A logger which uses the Firebug 'console'
 	logger =  {
@@ -66,7 +66,8 @@
 	    connection.addHandler(on_iq, null, 'iq', null, null, null);
 	};
 
-	fetch = function(jid) {
+	fetch = function(jid, callback) {
+	    logger.info("Fetching vcard for " + jid);
 	    connection.sendIQ($iq({
 		'type': 'get',
 		'to': jid,
@@ -85,12 +86,38 @@
 		    logger.info("Invoking roster.callbacks.contact_changed");
 		    connection.roster.callbacks.contact_changed(contact);
 		}
+		contact.vcard = stanza.getElementsByTagName('vCard')[0];
+		if (typeof(callback) === 'Function') { callback(contact); }
 	    });
+	};
+
+	/** 
+	 * Function: save
+	 *
+	 * Save a VCard-4 contact. 
+	 *
+	 * Parameters:
+	 * vcard (function) - A function which provides a VCard. This function is passed a <Strophe.Builder> object
+	 */
+	save = function(vcard) {
+	    var iq = $iq({
+		'type': 'set',
+		'to': connecton.jid,
+		'xmlns': Strophe.NS.CLIENT
+	    }).c('publish', {
+		'xmlns': Strophe.NS.VCARD4_PUBLISH
+	    }).c('vcard' {
+		'xmlns': 'urn:ietf:params:xml:ns:vcard-4.0'
+	    });
+	    vcard(iq);
+	    console.debug(iq.tree());
+	    connection.sendIQ(iq);	      
 	};
 
 	that = {};
 	that.init = init;
 	that.fetch = fetch;
+	that.save = save;
 	return that;
     }()))
 }());
