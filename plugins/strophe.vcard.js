@@ -59,6 +59,10 @@
 	    connection = conn;
 	    Strophe.addNamespace('VCARD_TEMP',"vcard-temp");
 	    Strophe.addNamespace('VCARD_TEMP_UPDATE',"vcard-temp:x:update");
+	    Strophe.addNamespace('VCARD4',"http://onesocialweb.org/spec/1.0/vcard4");
+	    Strophe.addNamespace('VCARD4_PUBLISH', Strophe.NS.VCARD4 + "#publish");
+	    Strophe.addNamespace('VCARD4_MERGE', Strophe.NS.VCARD4 + "#merge");
+	    Strophe.addNamespace('VCARD4_REMOVE', Strophe.NS.VCARD4 + "#remove");
 	    connection.addHandler(on_iq, null, 'iq', null, null, null);
 	};
 
