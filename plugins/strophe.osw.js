@@ -1,3 +1,7 @@
+
+(function() {
+
+
 // FIXME? I might not belong in this file.
 window.osw = {
 	'NS' : {
@@ -131,207 +135,6 @@ osw.acl = {
 	},
 }
 
-/*
-Class: osw.object
-
-	A class for creating and paring objects for activities.
-
-*/
-osw.object = {
-	/*
-		Function: create
-			Create an object of any known type and return a DOM node
-	*/
-	'create' : function(type, fields) {
-		var builder = $build('object', {xmlns: osw.NS.activity});
-
-		// TODO make modular
-		switch(type) {
-			case 'status':
-			case osw.object.type.status:
-				// this could include text/html and other formats. for now, just text.
-				var contentType = 'text/plain';
-
-				builder
-					.c('object-type', {'xmlns': osw.NS.activity})
-						.t(osw.object.type.status).up()
-					.c('content', {xmlns: osw.NS.atom,type: contentType})
-						.t( fields.status ).up();
-				break;
-
-			case 'picture':
-			case osw.object.type.picture:
-				builder
-					.c('object-type', {'xmlns': osw.NS.activity})
-						.t(osw.object.type.picture).up()
-					.c('link', {'xmlns': osw.NS.xhtml, 'rel': 'alternate', 'href' : fields.picture}).up();
-				break;
-
-		}
-
-		return builder.tree();
-	},
-
-	/*
-		Function: picture
-
-			Short hand for creating a picture object
-
-	*/
-	'picture' : function(picture) {
-		return osw.object.create('picture', {'picture' : picture});
-	},
-
-	/*
-		Function: status
-
-			Short hand cor creating a status object
-	*/
-	'status' : function(status) {
-		return osw.object.create('status', {'status' : status});
-	},
-
-
-	/*
-		Function: parse
-			TODO
-
-	*/
-	'parse' : function(entryNode) {
-		var obj;
-		$(entryNode).xmlns( osw.NS, function() {
-			obj = {
-				'id': this.find("id").text(),
-				'published': this.find("atom|published").text(),
-				'objectType': this.find("activity|object-type").text()
-			}; 
-
-			// TODO make modular
-			switch(obj.objectType) {
-				case osw.object.type.status:
-					obj.status = $(this).find("atom|content").text();
-					break;
-
-				case osw.object.type.picture:
-					obj.picture = $(this).find("html|link[rel='alternate']").attr("href");
-					break;
-			}
-		});
-
-		return obj;
-	},
-
-    /*
-	Constants: type
-      
-		Constants for subject types
-
-		type.status - A status message that may contain content of type text/plain
-		type.picture - A picture that may contain the URL of a picture node. 
-
-	*/
-
-	'type' : {
-		'status' : 'http://onesocialweb.org/spec/1.0/object/status',
-		'picture' : 'http://onesocialweb.org/spec/1.0/object/picture',
-	}
-
-}
-
-/*
-	Class: osw.activity
-
-		A class for parsing and eventually creating OSW activities.
-
-*/
-
-osw.activity = {
-
-	/*
-	Function: parse
-
-		Parse an activity from an ATOM entry node. It is such because pubsub has
-		multiple namespaces that contain activities--I've encountered /pubsub
-		and /pubsub#events.
-
-	Parameters:
-
-		entry - The ATOM entry node to parse the event from
-
-
-	Returns:
-
-		A JSON replresentation of the activity. See osw.acl for more info.
-
-		: { id, title, published, verb, name, jid, acl: [rule], object: [{id, published, objectType, ...}] }
-
-
-	*/
-
-	'parse' : function(entry) {
-		var activity;
-
-		$(entry).xmlns( osw.NS, function() {
-			
-				activity = {
-					'id' : this.find("atom|id").text(),
-					'title' : this.find("atom|title").text(),
-					'published' : this.find("atom|published").text(),
-
-					'verb' : this.find("activity|verb").text(),
-					'name' : this.find("activity|actor > atom|name").text(),
-					'jid' : this.find("activity|actor > atom|uri").text(),
-
-					'acl' : this.find("osw|acl-rule").map(function() { 
-						return osw.acl.parse(this);
-					}),
-
-					'objects' : this.find("activity|object").map(function() { 
-						return osw.object.parse( this );
-					}),
-				};
-		});
-
-		return activity;
-
-	},
-
-	/*
-	Function: create
-		Create an activity that can be added to a publication or other node. It
-		creates it in the context of an ATOM entry node.
-
-	Parameters:
-		title - The title of the activity. This is generally the same as an appended 'status' object, but not necessary.
-		objects - An array of object DOM nodes created by osw.object.create.
-		rules - An array of acl rule DOM nodes created by osw.acl.rule.
-
-	Example:
-
-		An activity can have multiple objects and ACL rules. This example creates
-		a picture with a status caption, and allows everyone except enemies
-		to view it.
-
-		: osw.activity.create( 'Some Activity', [ osw.object.status('Some Activity'), osw.object.picture('http://example.com/picture.jpg' ], [ osw.acl.rule('grant', 'view', 'everyone'), osw.acl.rule('deny', view', 'enemies' ] );
-
-	*/
-
-	'create' : function(title, objects, rules) {
-		var builder = $build('entry', {'xmlns': osw.NS.atom})
-			.c('title').t( title ).up()
-			.c('verb', {'xmlns': osw.NS.activity}).t( 'http://activitystrea.ms/schema/1.0/post' ).up();
-
-		$.each(objects || [], function(i, obj) {
-			builder.cnode( obj ).up();
-		});
-
-		$.each(rules || [], function(i, rule) {
-			builder.cnode( rule ).up();
-		});
-
-		return builder.tree();
-	},
-}
 
 
 /*
@@ -562,15 +365,16 @@ Strophe.addConnectionPlugin('osw', {
 
 	_receivedMessage_Activity: function(msg) {
 		try {
-			var self = this;
+			var me = this;
 
 			$(msg).xmlns( osw.NS, function() {
 				var entries = this.find("pubsubevt|event > pubsubevt|items > pubsubevt|item > atom|entry");
 				if( entries.length > 0 ) {
 					entries.each(function(i, entry) {
-						var activity = osw.activity.parse( entry );
 
-						self.callbacks.received_activity.trigger( activity );
+						me.parseActivity( entry );
+
+						me.callbacks.received_activity.trigger( activity );
 					});
 				}
 			});
@@ -605,14 +409,27 @@ Strophe.addConnectionPlugin('osw', {
 		);
 	},
 
+	
+	parseActivity: function( entryNode ) {
+		var activity = $activity.parse( entryNode );
+
+
+		// FIXME put this into a function somewhere.
+		activity.acl = $(entryNode).find("osw|acl-rule").map(function() { 
+			return osw.acl.parse(this);
+		});
+
+		return activity;
+	},
+
 	_receivedActivities: function(iq) {
-		var self = this;
+		var me = this;
 
 		$(iq).xmlns( osw.NS, function() {
-			this.find("pubsub|pubsub > pubsub|items > pubsub|item > atom|entry").each(function(i, entry) {
-				var activity = osw.activity.parse( entry );
+			this.find("pubsub|pubsub > pubsub|items > pubsub|item > atom|entry").each(function(i, entryNode) {
+				var activity = me.parseActivity( entryNode );
 
-				self.callbacks.received_activity.trigger( activity );
+				me.callbacks.received_activity.trigger( activity );
 			});
 		});
 	},
@@ -625,11 +442,11 @@ Strophe.addConnectionPlugin('osw', {
 	Function: publishActivity
 
 		Publish an activity based on an ATOM entry node, created by 
-		osw.activity.create. See that method for detauls.
+		$activity.create. See that method for detauls.
 
 	Parameters:
 
-		entryNode - An entry node created by osw.activity.create
+		entryNode - An entry node created by $activity.create
 	*/
 
 
@@ -677,13 +494,13 @@ Strophe.addConnectionPlugin('osw', {
     },
 
 	_receivedInbox: function(iq) {
-		var self = this;
+		var me = this;
 
 		$(iq).xmlns( osw.NS, function() {
-			this.find("pubsub|pubsub > pubsub|items > pubsub|item > atom|entry").each(function(i, entry) {
-				var activity = osw.activity.parse( entry );
+			this.find("pubsub|pubsub > pubsub|items > pubsub|item > atom|entry").each(function(i, entryNode) {
+				var activity = me.parseActivity( entryNode );
 
-				self.callbacks.received_activity.trigger( activity );
+				me.callbacks.received_activity.trigger( activity );
 			});
 		});
 	},
@@ -849,4 +666,6 @@ Strophe.addConnectionPlugin('osw', {
 		}).t(nickname));
     },
 });
+
+})();
 
