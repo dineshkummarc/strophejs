@@ -106,11 +106,10 @@
 		'xmlns': Strophe.NS.CLIENT
 	    }).c('publish', {
 		'xmlns': Strophe.NS.VCARD4_PUBLISH
-	    }).c('vcard' {
+	    }).c('vcard', {
 		'xmlns': 'urn:ietf:params:xml:ns:vcard-4.0'
 	    });
 	    vcard(iq);
-	    console.debug(iq.tree());
 	    connection.sendIQ(iq);	      
 	};
 
