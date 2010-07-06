@@ -30,6 +30,11 @@ LIB[:test] = FileList["tests/lib/*.js"]
 
 VENDOR = {
   :main => {
+    "xml2json" => {
+      #:url => "http://goessner.net/download/prj/jsonxml/xml2json.js",
+      :url => "http://www.thomasfrank.se/downloadableJS/xml2json.js",
+      :file => "xml2json.js"
+    }
   },
   :test => {
     "qunit" => {
@@ -62,10 +67,12 @@ end
 
 DEPENDENCIES = Hash.new
 DEPENDENCIES[:test] = VENDOR[:test].map { |key, value| "vendor/#{value[:file]}" }
+DEPENDENCIES[:main] = VENDOR[:main].map { |key, value| "vendor/#{value[:file]}" }
+DEPENDENCIES[:all] = DEPENDENCIES[:main] + DEPENDENCIES[:test]
 
 def execute_test(command, filename)
   cmd = ""
-  (DEPENDENCIES[:test] + LIB[:test] + SRC + PLUGINS + [filename]).each do |f|
+  (DEPENDENCIES[:all] + LIB[:test] + SRC + PLUGINS + [filename]).each do |f|
     cmd << "load('#{f}');"
   end
   cmd << "window.location = '';"
@@ -76,13 +83,17 @@ task :test_file, [:filename] do |t, args|
   execute_test(rhino[:cmd], args.filename)
 end
 
-task :test => [rhino[:jar]] + DEPENDENCIES[:test] do |t, args|
+task :debug_test_file, [:filename] do |t, args|
+  execute_test(rhino[:debugger], args.filename)
+end
+
+task :test => [rhino[:jar]] + DEPENDENCIES[:all] do |t, args|
   TEST.each do |file|
     execute_test(rhino[:cmd],file)
   end
 end  
 
-task :debug_test => [rhino[:jar]] + DEPENDENCIES[:test] do
+task :debug_test => [rhino[:jar]] + DEPENDENCIES[:all] do
   execute_test(rhino[:debugger], "tests/tests.js")
 end  
 
