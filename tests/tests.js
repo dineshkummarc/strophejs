@@ -1,3 +1,4 @@
+
 $(document).ready(function () {
     module("JIDs");
 
@@ -80,6 +81,8 @@ $(document).ready(function () {
             conn.send(stanza);
         } catch (e) {}
         ok(conn._data.length === 1, "Output queue contains an element");
+
+	clearTimeout(conn._idleTimeout);
     });
 
     test("send() does not accept strings", function () {
@@ -93,6 +96,8 @@ $(document).ready(function () {
         } catch (e) {
             equals(e.name, "StropheError", "send() should throw exception");
         }
+
+	clearTimeout(conn._idleTimeout);
     });
 
     test("Builder with XML attribute escaping test", function () {
@@ -159,5 +164,6 @@ $(document).ready(function () {
         var output = conn._quote(input);
         equals(output, "\"\\\"beep \\\\40\\\"\"",
                "string should be quoted and escaped");
+	clearTimeout(conn._idleTimeout);
     });
 });

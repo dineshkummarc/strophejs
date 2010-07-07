@@ -5,13 +5,14 @@ Modified by Owen Griffin
 
 (function() {
     Strophe.addConnectionPlugin('roster', (function() {
-	var that, init, connection, callbacks, version, logger, contacts, on_presence, on_iq, get_contact, parse_query, parse_contact, fetch, subscribe, unsubscribe, authorize, unauthorize, update_contact, set_callbacks, supports_versioning, status_changed;
+	var that, init, connection, callbacks, version, logger, contacts, on_presence, on_iq, on_message, get_contact, parse_query, parse_contact, fetch, subscribe, unsubscribe, authorize, unauthorize, update_contact, set_callbacks, supports_versioning, status_changed;
 
 	// A logger which uses the Firebug 'console'
 	logger =  {
 	    debug: function(msg) {
 		if (typeof(console) !== 'undefined') {
-		    console.debug('strophe.roster: ' + msg);
+		    console.debug('strophe.roster: ');
+		    console.debug(msg);
 		}
 	    },
 	    info: function(msg) {
@@ -46,6 +47,13 @@ Modified by Owen Griffin
 	callbacks.presence_changed = function(contact) {};
 
 	/**
+	 * Callback: contact_changed
+	 * 
+	 * Invoked when a contact has their details changed and needs to be re-drawn
+	 */
+	callbacks.contact_changed = function(contact) {};
+
+	/**
 	 * Group: Functions
 	 */
 
@@ -64,6 +72,10 @@ Modified by Owen Griffin
 		    logger.info("Overriding presence_changed callback");
 		    callbacks.presence_changed = callbks.presence_changed;
 		}
+		if (typeof(callbks.contact_changed) !== 'undefined') {
+		    logger.info("Overriding contact_changed callback");
+		    callbacks.contact_changed = callbks.contact_changed;
+		}
 	    }
 	};
 
@@ -74,6 +86,17 @@ Modified by Owen Griffin
 	 *
 	 * Parameters:
 	 * jid - The Jabber identifier of the contact
+	 *
+	 * Returns: 
+	 * {
+	 *   jid: '',
+	 *   resources: [],
+	 *   nickname: '',
+	 *   avatar: {
+	 *     url: '',
+	 *     data: ''
+         *   }
+	 * }
 	 */
 	get_contact = function(jid) {
 	    var index; 
@@ -90,6 +113,7 @@ Modified by Owen Griffin
 		// Bind to event handlers
 		connection.addHandler(on_presence, null, 'presence', null, null, null);
 		connection.addHandler(on_iq, Strophe.NS.ROSTER, 'iq', "set", null, null);
+		connection.addHandler(on_message, null, 'message', null, null, null);
 		fetch();
 	    } else if (status === Strophe.Status.DISCONNECTED) {
 		// Remove any of the resources associated to all contacts
@@ -142,6 +166,26 @@ Modified by Owen Griffin
 	on_iq = function(iq) {
 	    connection.send($iq({type: 'result', id: iq.id, to: iq.from}));
 	    parse_query(iq);
+	    return true;
+	};
+
+	/**
+	 * PrivateFunction: on_message
+	 *
+	 * Strophe callback invoked on a 'message' stanza.
+	 */
+	on_message = function(stanza) {
+	    var jid, contact, nick, nickname;
+	    jid = stanza.getAttribute('from');
+	    contact = connection.roster.get_contact(jid);
+	    if (contact) {
+		nick = stanza.getElementsByTagName('nick');
+		if (nick.length === 1) {
+		    contact.nickname = Strophe.getText(nick[0]);
+		    logger.info("Invoking contact_changed callback");
+		    callbacks.contact_changed(contact);
+		} 
+	    }
 	    return true;
 	};
 
@@ -315,6 +359,7 @@ Modified by Owen Griffin
 	that.update_contact = update_contact;
 	that.supports_versioning = supports_versioning;
 	that.statusChanged = status_changed;
+	that.callbacks = callbacks;
 	return that;
     }()))
 }());
