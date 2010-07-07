@@ -30,11 +30,6 @@ LIB[:test] = FileList["tests/lib/*.js"]
 
 VENDOR = {
   :main => {
-    "xml2json" => {
-      #:url => "http://goessner.net/download/prj/jsonxml/xml2json.js",
-      :url => "http://www.thomasfrank.se/downloadableJS/xml2json.js",
-      :file => "xml2json.js"
-    }
   },
   :test => {
     "qunit" => {
