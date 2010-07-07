@@ -41,13 +41,6 @@ to='stpeter@jabber.org/roundabout' \
 
 	     mockRoster = jack.create("mockRoster", ["get_contact"]);
 
-	     jack.expect("mockConnection.addHandler")
-                 .exactly("1 time").mock(
-                     function(callback, ns, type) {
-                         if (type == "iq") {
-                             callbackIQ = callback;
-                         }
-                     });
 	     jack.expect("mockConnection.sendIQ")
                  .once().mock(
                      function(iq, callbacksuccess, callbackerror) {
@@ -65,10 +58,13 @@ to='stpeter@jabber.org/roundabout' \
 
 	     plugin.init(mockConnection, mockRoster);
 	     plugin.fetch("jer@jabber.org", function(contact) {
-		 console.debug("Contact!");
-		 console.debug(contact);
+		 equals("jer", contact.nickname);
+		 equals("JeremieMiller", contact.name);
+		 equals("Jeremie", contact.n.given);
+		 equals("Miller", contact.n.family);
+		 // equals("jeremie@jabber.org", contact.email.userid);
 	     });
-	     ok(callbackIQ(vCardResponse), "IQ handler should return true");
+	     
 	     
 	 });
 
