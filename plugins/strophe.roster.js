@@ -5,7 +5,7 @@ Modified by Owen Griffin
 
 (function() {
     Strophe.addConnectionPlugin('roster', (function() {
-	var that, init, connection, callbacks, version, logger, contacts, on_presence, on_iq, get_contact, parse_query, parse_contact, fetch, subscribe, unsubscribe, authorize, unauthorize, update_contact, set_callbacks, supports_versioning;
+	var that, init, connection, callbacks, version, logger, contacts, on_presence, on_iq, get_contact, parse_query, parse_contact, fetch, subscribe, unsubscribe, authorize, unauthorize, update_contact, set_callbacks, supports_versioning, status_changed;
 
 	// A logger which uses the Firebug 'console'
 	logger =  {
@@ -83,6 +83,23 @@ Modified by Owen Griffin
 		}
 	    }
 	    return false;
+	};
+
+	status_changed = function(status) {
+	    if (status === Strophe.Status.CONNECTED) {
+		// Bind to event handlers
+		connection.addHandler(on_presence, null, 'presence', null, null, null);
+		connection.addHandler(on_iq, Strophe.NS.ROSTER, 'iq', "set", null, null);
+		fetch();
+	    } else if (status === Strophe.Status.DISCONNECTED) {
+		// Remove any of the resources associated to all contacts
+		(function() {
+		    var index; 
+		    for (index = 0; index < contacts.length; index = index + 1) {
+			contacts[index].resources = [];
+		    }	
+		}());
+	    }
 	};
 
 	/**
@@ -184,9 +201,6 @@ Modified by Owen Griffin
 	    connection = conn;
 	    version = 'unknown';
 	    contacts = [];
-	    // Bind to event handlers
-	    connection.addHandler(on_presence, null, 'presence', null, null, null);
-            connection.addHandler(on_iq, Strophe.NS.ROSTER, 'iq', "set", null, null);
 
             Strophe.addNamespace('ROSTER_VER', 'urn:xmpp:features:rosterver');
 	};
@@ -300,6 +314,7 @@ Modified by Owen Griffin
 	that.subscribe = subscribe;
 	that.update_contact = update_contact;
 	that.supports_versioning = supports_versioning;
+	that.statusChanged = status_changed;
 	return that;
     }()))
 }());
