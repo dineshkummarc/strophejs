@@ -1,5 +1,9 @@
-/*
-
+/**
+ * Strophe.js plugin for XEP-0054 and XEP-0153.
+ * 
+ * Depends: 
+ * - JQuery
+ * - strophe.roster.js
 */
 (function() {
     Strophe.addConnectionPlugin('vcard-temp', (function() {
@@ -33,6 +37,10 @@
 	 * Function: init
 	 *
 	 * Constructor for Strophe plugin
+	 *
+	 * Parameters:
+	 * connection - A Strophe connection object
+	 * rster - A roster which defines the 'get_contact(jid)' method
 	 */
 	init = function(conn, rster) {
 	    connection = conn;
@@ -41,6 +49,15 @@
 	    Strophe.addNamespace('VCARD_TEMP_UPDATE',"vcard-temp:x:update");
 	};
 
+	/**
+	 * Function: fetch
+	 *
+	 * Fetches the VCard for a specified contact.
+	 *
+	 * Parameters:
+	 * jid - The Jabber identifier for the user
+	 * callback - A function to be invoked with a contact object
+	 **/
 	fetch = function(jid, callback) {
 	    logger.info("Fetching vcard for " + jid);
 	    connection.sendIQ($iq({
@@ -90,8 +107,9 @@
 			contact.avatar.type = stanza.find('PHOTO TYPE').first().text();
 			contact.avatar.data = stanza.find('PHOTO BINVAL').first().text();
 			logger.info("Invoking roster.callbacks.contact_changed");
-			connection.roster.callbacks.contact_changed(contact);
+			
 		    }
+		    connection.roster.callbacks.contact_changed(contact);
 		}
 		if (typeof(callback) === 'function') { callback(contact); }
 		
@@ -101,7 +119,7 @@
 	/** 
 	 * Function: save
 	 *
-	 * Save a VCard-4 contact. 
+	 * Save a VCard contact. 
 	 *
 	 * Parameters:
 	 * vcard (function) - A function which provides a VCard. This function is passed a <Strophe.Builder> object
@@ -111,10 +129,8 @@
 		'type': 'set',
 		'to': connecton.jid,
 		'xmlns': Strophe.NS.CLIENT
-	    }).c('publish', {
-		'xmlns': Strophe.NS.VCARD4_PUBLISH
-	    }).c('vcard', {
-		'xmlns': 'urn:ietf:params:xml:ns:vcard-4.0'
+	    }).c('cCard', {
+		'xmlns': Strophe.NS.VCARD_TEMP
 	    });
 	    vcard(iq);
 	    connection.sendIQ(iq);	      
