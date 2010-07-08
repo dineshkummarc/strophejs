@@ -77,8 +77,10 @@
 	    }), function(stanza) {
 		var photo;
 		photo = $(stanza).find('PHOTO BINVAL');
+		contact = connection.roster.get_contact(jid);
+		if (contact) {
 		if (photo.length > 0) {
-		    contact = connection.roster.get_contact(jid);
+		    
 		    if (typeof(contact.avatar) === 'undefined') {
 			contact.avatar = {}; 
 		    }
@@ -88,6 +90,7 @@
 		}
 		contact.vcard = stanza.getElementsByTagName('vCard')[0];
 		if (typeof(callback) === 'Function') { callback(contact); }
+		}
 	    });
 	};
 

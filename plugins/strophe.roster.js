@@ -118,13 +118,14 @@ Modified by Owen Griffin
 	    jid = presence.getAttribute('from');
 	    from = Strophe.getBareJidFromJid(jid);
 	    type = presence.getAttribute('type');
-
-	    contact = get_contact(jid);
+	    contact = get_contact(from);
 	    if (contact) {		
 		if (type === 'unavailable') {
+		    logger.info('Removing resource ' + Strophe.getResourceFromJid(jid) + ' from ' + from);
 		    // Remove the resource from the contact
 		    delete contact.resources[Strophe.getResourceFromJid(jid)];
 		} else {
+		    logger.info('Adding resource ' + Strophe.getResourceFromJid(jid) + '  to ' + from);
 		    contact.resources[Strophe.getResourceFromJid(jid)] = {
 			show : (presence.getElementsByTagName('show').length != 0) ? Strophe.getText(presence.getElementsByTagName('show')[0]) : "",
 			status   : (presence.getElementsByTagName('status').length != 0) ? Strophe.getText(presence.getElementsByTagName('status')[0]) : "",
@@ -135,8 +136,24 @@ Modified by Owen Griffin
 		// The contact is not part of the roster
 		if (type === 'subscribe') {
 		    callbacks.presence_subscription_request(jid);
+		} else {
+		    contact = {
+			jid: from,
+			resources: [],
+			groups: []
+		    };
+		    contact.resources[Strophe.getResourceFromJid(jid)] = {
+			show: '',
+			status: '',
+			priority: ''
+		    };
+		    contacts.push(contact);
+		    logger.info('Invoking presence_changed callback');
+		    logger.debug(contact);
+		    callbacks.presence_changed(contact);
 		}
 	    }
+	    
 	    return true;
 	};
 
@@ -167,6 +184,7 @@ Modified by Owen Griffin
 		    logger.info("Invoking contact_changed callback");
 		    callbacks.contact_changed(contact);
 		} 
+		
 	    }
 	    return true;
 	};
@@ -210,6 +228,7 @@ Modified by Owen Griffin
 		};
 		contacts.push(item);
             } else {
+		logger.info("Updating existing contact");
 		item.name = name;
 		item.subscription = subscription;
 		item.group = groups;
