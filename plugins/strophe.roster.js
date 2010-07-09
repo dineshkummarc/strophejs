@@ -40,13 +40,6 @@ Modified by Owen Griffin
 	callbacks.presence_subscription_request = function() {};
 
 	/**
-	 * Callback: presence_changed
-	 *
-	 * Invoked when the presence of a contact has changed
-	 */
-	callbacks.presence_changed = function(contact) {};
-
-	/**
 	 * Callback: contact_changed
 	 * 
 	 * Invoked when a contact has their details changed and needs to be re-drawn
@@ -67,10 +60,6 @@ Modified by Owen Griffin
 		if (typeof(callbks.presence_subscription_request) !== 'undefined') {
 		    logger.info("Overriding presence_subscription_request callback");
 		    callbacks.presence_subscription_request = callbks.presence_subscription_request;
-		}
-		if (typeof(callbks.presence_changed) !== 'undefined') {
-		    logger.info("Overriding presence_changed callback");
-		    callbacks.presence_changed = callbks.presence_changed;
 		}
 		if (typeof(callbks.contact_changed) !== 'undefined') {
 		    logger.info("Overriding contact_changed callback");
@@ -136,25 +125,54 @@ Modified by Owen Griffin
 	    jid = presence.getAttribute('from');
 	    from = Strophe.getBareJidFromJid(jid);
 	    type = presence.getAttribute('type');
-
-	    contact = get_contact(jid);
+	    contact = get_contact(from);
 	    if (contact) {		
 		if (type === 'unavailable') {
+		    logger.info('Removing resource ' + Strophe.getResourceFromJid(jid) + ' from ' + from);
 		    // Remove the resource from the contact
 		    delete contact.resources[Strophe.getResourceFromJid(jid)];
+		    // Update the available attribute
+		    contact.available = (function(resources) {
+			var k, count;
+			for (k in resources) {
+			    if (resources.hasOwnProperty(k)) {
+				count = count + 1;
+			    }
+			}
+			return count > 0;
+		    }(contact.resources));
 		} else {
+		    logger.info('Adding resource ' + Strophe.getResourceFromJid(jid) + '  to ' + from);
 		    contact.resources[Strophe.getResourceFromJid(jid)] = {
 			show : (presence.getElementsByTagName('show').length != 0) ? Strophe.getText(presence.getElementsByTagName('show')[0]) : "",
 			status   : (presence.getElementsByTagName('status').length != 0) ? Strophe.getText(presence.getElementsByTagName('status')[0]) : "",
 			priority : (presence.getElementsByTagName('priority').length != 0) ? Strophe.getText(presence.getElementsByTagName('priority')[0]) : ""	
 		    };
+		    contact.available = true;
 		}
 	    } else {
 		// The contact is not part of the roster
 		if (type === 'subscribe') {
 		    callbacks.presence_subscription_request(jid);
+		} else {
+		    contact = {
+			jid: from,
+			name: from,
+			resources: [],
+			groups: [],
+			available: true
+		    };
+		    contact.resources[Strophe.getResourceFromJid(jid)] = {
+			show: '',
+			status: '',
+			priority: ''
+		    };
+		    contacts.push(contact);
+		    logger.info('Invoking contact_changed callback');
+		    callbacks.contact_changed(contact);
 		}
 	    }
+	    
 	    return true;
 	};
 
@@ -185,6 +203,7 @@ Modified by Owen Griffin
 		    logger.info("Invoking contact_changed callback");
 		    callbacks.contact_changed(contact);
 		} 
+		
 	    }
 	    return true;
 	};
@@ -224,16 +243,18 @@ Modified by Owen Griffin
                     jid          : jid,
                     subscription : subscription,
                     groups       : groups,
-                    resources    : {}
+                    resources    : {},
+		    available    : false
 		};
 		contacts.push(item);
             } else {
+		logger.info("Updating existing contact");
 		item.name = name;
 		item.subscription = subscription;
-		item.group = groups;
+		item.groups = groups;
             }
-	    logger.info("Invoking presence_changed callback");
-	    callbacks.presence_changed(item);
+	    logger.info("Invoking contact_changed callback");
+	    callbacks.contact_changed(item);
 	};
 	
 	/**
