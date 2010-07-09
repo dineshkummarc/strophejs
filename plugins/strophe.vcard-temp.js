@@ -7,24 +7,24 @@
 */
 (function() {
     Strophe.addConnectionPlugin('vcard-temp', (function() {
-	var that, init, connection, roster, callbacks, logger, fetch, save;
+	var that, init, connection, roster, callbacks, logger, fetch, save, status_changed, on_presence;
 
 	// A logger which uses the Firebug 'console'
 	logger =  {
 	    debug: function(msg) {
 		if (typeof(console) !== 'undefined') {
-		    console.debug('strophe.vcard: ');
+		    console.debug('strophe.vcard-temp: ');
 		    console.debug(msg);
 		}
 	    },
 	    info: function(msg) {
 		if (typeof(console) !== 'undefined') {
-		    console.info('strophe.vcard: ' + msg);
+		    console.info('strophe.vcard-temp: ' + msg);
 		}
 	    },
 	    error: function(msg) {
 		if (typeof(console) !== 'undefined') {
-		    console.error('strophe.vcard: ' + msg);
+		    console.error('strophe.vcard-temp: ' + msg);
 		}
 	    }
 	};
@@ -44,9 +44,44 @@
 	 */
 	init = function(conn, rster) {
 	    connection = conn;
-	    roster = rster;
+	    roster = connection.roster;
 	    Strophe.addNamespace('VCARD_TEMP',"vcard-temp");
 	    Strophe.addNamespace('VCARD_TEMP_UPDATE',"vcard-temp:x:update");
+	};
+
+	status_changed = function(status) {
+	    if (status === Strophe.Status.CONNECTED) {
+		// Bind to event handlers
+		logger.info("Binding on_presence handler")
+		connection.addHandler(on_presence, null, 'presence', null, null, null);
+	    } 
+	};
+
+	/**
+	 * PrivateFunction: on_presence
+	 *
+	 * Strophe callback invoked on a 'presence' message
+	 */
+	on_presence = function(presence) {
+	    var jid, from, contact;
+	    jid = presence.getAttribute('from');
+	    from = Strophe.getBareJidFromJid(jid);
+	    type = presence.getAttribute('type');
+	    if ($(presence).find('x').first().attr('xmlns') === Strophe.NS.VCARD_TEMP_UPDATE) {
+
+		logger.info("VCard update for " + jid);
+		contact = roster.get_contact(from);
+		logger.info("Contact = " + contact);
+		roster.dump_contacts();
+		if (contact) {
+		    if (typeof(contact.avatar) === 'undefined' ||
+			typeof(contact.avatar.md5) === 'undefined' ||
+			contact.avatar.md5 !== $(presence).find('x photo').first().text()) {
+			fetch(from);
+		    }
+		}
+	    }
+	    return true;
 	};
 
 	/**
@@ -140,6 +175,7 @@
 	that.init = init;
 	that.fetch = fetch;
 	that.save = save;
+	that.statusChanged = status_changed;
 	return that;
     }()))
 }());
