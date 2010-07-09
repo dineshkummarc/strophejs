@@ -40,13 +40,6 @@ Modified by Owen Griffin
 	callbacks.presence_subscription_request = function() {};
 
 	/**
-	 * Callback: presence_changed
-	 *
-	 * Invoked when the presence of a contact has changed
-	 */
-	callbacks.presence_changed = function(contact) {};
-
-	/**
 	 * Callback: contact_changed
 	 * 
 	 * Invoked when a contact has their details changed and needs to be re-drawn
@@ -67,10 +60,6 @@ Modified by Owen Griffin
 		if (typeof(callbks.presence_subscription_request) !== 'undefined') {
 		    logger.info("Overriding presence_subscription_request callback");
 		    callbacks.presence_subscription_request = callbks.presence_subscription_request;
-		}
-		if (typeof(callbks.presence_changed) !== 'undefined') {
-		    logger.info("Overriding presence_changed callback");
-		    callbacks.presence_changed = callbks.presence_changed;
 		}
 		if (typeof(callbks.contact_changed) !== 'undefined') {
 		    logger.info("Overriding contact_changed callback");
@@ -161,9 +150,8 @@ Modified by Owen Griffin
 			priority: ''
 		    };
 		    contacts.push(contact);
-		    logger.info('Invoking presence_changed callback');
-		    logger.debug(contact);
-		    callbacks.presence_changed(contact);
+		    logger.info('Invoking contact_changed callback');
+		    callbacks.contact_changed(contact);
 		}
 	    }
 	    
@@ -247,8 +235,8 @@ Modified by Owen Griffin
 		item.subscription = subscription;
 		item.groups = groups;
             }
-	    logger.info("Invoking presence_changed callback");
-	    callbacks.presence_changed(item);
+	    logger.info("Invoking contact_changed callback");
+	    callbacks.contact_changed(item);
 	};
 	
 	/**
