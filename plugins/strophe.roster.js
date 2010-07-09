@@ -124,6 +124,16 @@ Modified by Owen Griffin
 		    logger.info('Removing resource ' + Strophe.getResourceFromJid(jid) + ' from ' + from);
 		    // Remove the resource from the contact
 		    delete contact.resources[Strophe.getResourceFromJid(jid)];
+		    // Update the available attribute
+		    contact.available = (function(resources) {
+			var k, count;
+			for (k in resources) {
+			    if (resources.hasOwnProperty(k)) {
+				count = count + 1;
+			    }
+			}
+			return count > 0;
+		    }(contact.resources));
 		} else {
 		    logger.info('Adding resource ' + Strophe.getResourceFromJid(jid) + '  to ' + from);
 		    contact.resources[Strophe.getResourceFromJid(jid)] = {
@@ -131,6 +141,7 @@ Modified by Owen Griffin
 			status   : (presence.getElementsByTagName('status').length != 0) ? Strophe.getText(presence.getElementsByTagName('status')[0]) : "",
 			priority : (presence.getElementsByTagName('priority').length != 0) ? Strophe.getText(presence.getElementsByTagName('priority')[0]) : ""	
 		    };
+		    contact.available = true;
 		}
 	    } else {
 		// The contact is not part of the roster
@@ -139,8 +150,10 @@ Modified by Owen Griffin
 		} else {
 		    contact = {
 			jid: from,
+			name: from,
 			resources: [],
-			groups: []
+			groups: [],
+			available: true
 		    };
 		    contact.resources[Strophe.getResourceFromJid(jid)] = {
 			show: '',
@@ -224,14 +237,15 @@ Modified by Owen Griffin
                     jid          : jid,
                     subscription : subscription,
                     groups       : groups,
-                    resources    : {}
+                    resources    : {},
+		    available    : false
 		};
 		contacts.push(item);
             } else {
 		logger.info("Updating existing contact");
 		item.name = name;
 		item.subscription = subscription;
-		item.group = groups;
+		item.groups = groups;
             }
 	    logger.info("Invoking presence_changed callback");
 	    callbacks.presence_changed(item);
