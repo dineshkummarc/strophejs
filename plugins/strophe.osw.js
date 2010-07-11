@@ -372,7 +372,7 @@ Strophe.addConnectionPlugin('osw', {
 				if( entries.length > 0 ) {
 					entries.each(function(i, entry) {
 
-						me.parseActivity( entry );
+						var activity = me.parseActivity( entry );
 
 						me.callbacks.received_activity.trigger( activity );
 					});
