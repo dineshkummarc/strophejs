@@ -6,7 +6,7 @@
 (function() {
     Strophe.addConnectionPlugin('account', (function() {
 
-	var that, init, register, connection, connection_callback, set_connection_callbacks, callbacks, logger;
+	var that, init, register, connection, status_changed, set_connection_callbacks, callbacks, logger;
 
 	// A logger which uses the Firebug 'console'
 	logger =  {
@@ -86,12 +86,12 @@
 	};
 
 	/**
-	 * PrivateFunction: connection_callback
+	 * Function: status_changed
 	 *
 	 * Callback which is invoked during the connection to the server whenever
 	 * authenticating or registering.
 	 */
-	connection_callback = function(status) {
+	status_changed = function(status) {
 	    var st;	    
 	    if (status === Strophe.Status.CONNECTED) {
 		logger.info("Invoking connected callback");
@@ -122,7 +122,7 @@
 	 **/
 	authenticate = function(username, domain, password) {
 	    logger.info('Connecting with username ' + username);
-	    connection.connect(username, domain, password, connection_callback);
+	    connection.connect(username, domain, password);
 	};
 
 	/**
@@ -177,6 +177,7 @@
 	that.register = register;
 	that.authenticate = authenticate;
 	that.set_connection_callbacks = set_connection_callbacks;
+	that.statusChanged = status_changed;
 	return that;
     }()))
 }());
