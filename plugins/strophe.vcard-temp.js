@@ -1,3 +1,49 @@
+
+var ContactRepository = function() {
+    var that, data, get, add;
+
+    data = [];
+
+    /**
+     * Function: add_vcard
+     *
+     * Adds a new VCard to the repository of vcards
+     **/
+    add = function(vcard) {
+	// Ensure that the JID contains no resource
+	vcard.jid = Strophe.getBareJidFromJid(vcard.jid);
+	// Add the card to the repository
+	data.push(vcard);
+    }
+    
+    /**
+     * Function: get
+     * 
+     * Returns a VCard for the given jid.
+     *
+     * Parameters:
+     * jid - The JID of the VCard to fetch
+     */
+    get = function(jid) {
+	var j, index;
+	// Strip the resource from the JID
+	j = Strophe.getBareJidFromJid(jid);
+	// Iterate through the repository until a matching vcard is found
+	for (index = 0; index < data.length; index = index + 1) {
+	    if (data[index].jid === j) {
+		return data[index];
+	    }
+	}
+	return false;
+    }
+
+    that = {};
+    that.add = add;
+    that.get = get;
+    return that;
+};
+
+
 /**
  * Strophe.js plugin for XEP-0054 and XEP-0153.
  * 
@@ -6,8 +52,8 @@
  * - strophe.roster.js
 */
 (function() {
-    Strophe.addConnectionPlugin('vcard-temp', (function() {
-	var that, init, connection, roster, callbacks, logger, fetch, save, status_changed, on_presence;
+    Strophe.addConnectionPlugin('vcardtemp', (function(repo) {
+	var that, init, connection, callbacks, logger, fetch, save, status_changed, on_presence, repository;
 
 	// A logger which uses the Firebug 'console'
 	logger =  {
@@ -29,6 +75,8 @@
 	    }
 	};
 
+	repository = repo;
+
 	/**
 	 * Group: Functions
 	 */
@@ -40,15 +88,22 @@
 	 *
 	 * Parameters:
 	 * connection - A Strophe connection object
-	 * rster - A roster which defines the 'get_contact(jid)' method
 	 */
-	init = function(conn, rster) {
+	init = function(conn, repo) {
 	    connection = conn;
-	    roster = connection.roster;
+	    if (typeof(repo) !== 'undefined') {
+		repository = repo;
+	    }
 	    Strophe.addNamespace('VCARD_TEMP',"vcard-temp");
 	    Strophe.addNamespace('VCARD_TEMP_UPDATE',"vcard-temp:x:update");
-	};
-
+	};	    
+	    
+	/**
+	 * Function: statusChanged
+	 *
+	 * Invoked in the Strophe plugin framework when the connection status
+	 * changes.
+	 */
 	status_changed = function(status) {
 	    if (status === Strophe.Status.CONNECTED) {
 		// Bind to event handlers
@@ -70,9 +125,7 @@
 	    if ($(presence).find('x').first().attr('xmlns') === Strophe.NS.VCARD_TEMP_UPDATE) {
 
 		logger.info("VCard update for " + jid);
-		contact = roster.get_contact(from);
-		logger.info("Contact = " + contact);
-		roster.dump_contacts();
+		contact = repository.get(from);
 		if (contact) {
 		    if (typeof(contact.avatar) === 'undefined' ||
 			typeof(contact.avatar.md5) === 'undefined' ||
@@ -94,59 +147,26 @@
 	 * callback - A function to be invoked with a contact object
 	 **/
 	fetch = function(jid, callback) {
-	    logger.info("Fetching vcard for " + jid);
+	    j = Strophe.getBareJidFromJid(jid);
+	    logger.info("Fetching vcard for " + j);
 	    connection.sendIQ($iq({
 		'type': 'get',
-		'to': jid,
+		'to': j,
 		'xmlns': Strophe.NS.CLIENT
 	    }).c('vCard', {
 		'xmlns': Strophe.NS.VCARD_TEMP
 	    }), function(stanza) {
-		var photo, contact;		
-		
-		contact = roster.get_contact(jid);
-		if (contact) {
-		    stanza = $(stanza);
-		    contact.name = stanza.find('FN').first().text();
-		    contact.nickname = stanza.find('NICKNAME').first().text();
-		    contact.n = {};
-		    contact.n.given = stanza.find('N GIVEN').first().text();
-		    contact.n.family = stanza.find('N FAMILY').first().text();
-		    contact.email = stanza.find('EMAIL USERID').first().text();
-		    contact.address = [];
-		    $.each(stanza.find('ADR'), function(index, adr) {
-			var address = {};
-			address.extension = $(adr).find('EXTADD').first().text();
-			address.street = $(adr).find('STREET').first().text();
-			address.locality = $(adr).find('LOCALITY').first().text();
-			address.region = $(adr).find('REGION').first().text();
-			contact.address.push(address);
-		    });
-		    contact.telephone = [];
-		    $.each(stanza.find('TEL'), function(index, element) {
-			var telephone = {};
-			element = $(element);
-			if (element.find('HOME').length > 0) {
-			    telephone.type = 'home';
-			} else if (element.find('WORK').length > 0) {
-			    telephone.type = 'work';
-			}
-
-			telephone.number = $(adr).find('NUMBER').first().text();
-			contact.telephone.push(telephone);
-		    });
-		    if (stanza.find('PHOTO').length > 0) {
-			if (typeof(contact.avatar) === 'undefined') {
-			    contact.avatar = {}; 
-			}
-			contact.avatar.type = stanza.find('PHOTO TYPE').first().text();
-			contact.avatar.data = stanza.find('PHOTO BINVAL').first().text();
-			logger.info("Invoking roster.callbacks.contact_changed");
-			
-		    }
-		    connection.roster.callbacks.contact_changed(contact);
-		}
-		if (typeof(callback) === 'function') { callback(contact); }
+		var vcard = repository.get(jid);
+		if (!vcard) {
+		    vcard = {
+			jid: jid
+		    };
+		    repository.add(vcard);
+		} 
+		jQuery.extend(vcard, $.xml2json(stanza.getElementsByTagName('vCard')[0]));		
+		logger.debug(vcard);
+		logger.debug(callback);
+		if (typeof(callback) === 'function') { callback(vcard); }
 		
 	    });
 	};
@@ -160,11 +180,11 @@
 	 * vcard (function) - A function which provides a VCard. This function is passed a <Strophe.Builder> object
 	 */
 	save = function(vcard) {
+	    j = Strophe.getBareJidFromJid(connection.jid);
 	    var iq = $iq({
 		'type': 'set',
-		'to': connecton.jid,
 		'xmlns': Strophe.NS.CLIENT
-	    }).c('cCard', {
+	    }).c('vCard', {
 		'xmlns': Strophe.NS.VCARD_TEMP
 	    });
 	    vcard(iq);
@@ -177,5 +197,5 @@
 	that.save = save;
 	that.statusChanged = status_changed;
 	return that;
-    }()))
+    }(ContactRepository())))
 }());

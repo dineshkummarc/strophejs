@@ -30,6 +30,10 @@ LIB[:test] = FileList["tests/lib/*.js"]
 
 VENDOR = {
   :main => {
+    "xml2json" => {
+      :url => "http://www.fyneworks.com/jquery/xml-to-json/jquery.xml2json.pack.js",
+      :file => "jquery.xml2json.js"
+    }
   },
   :test => {
     "qunit" => {
