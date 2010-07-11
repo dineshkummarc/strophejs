@@ -1,313 +1,387 @@
 /*
   Copyright 2010, François de Metz <francois@2metz.fr>
+Modified by Owen Griffin
 */
-/**
- * Roster Plugin
- * Allow easily roster management
- *
- *  Features
- *  * Get roster from server
- *  * handle presence
- *  * handle roster iq
- *  * subscribe/unsubscribe
- *  * authorize/unauthorize
- *  * roster versioning (xep 237)
- */
-Strophe.addConnectionPlugin('roster',
-{
-    _connection: null,
 
-    _callbacks : [],
-    /** Property: items
-     * Roster items
-     * [
-     *    {
-     *        name         : "",
-     *        jid          : "",
-     *        subscription : "",
-     *        groups       : ["", ""],
-     *        resources    : {
-     *            myresource : {
-     *                show   : "",
-     *                status : "",
-     *                priority : ""
-     *            }
-     *        }
-     *    }
-     * ]
-     */
-    items : [],
-    /** Property: ver
-     * current roster revision
-     * always null if server doesn't support xep 237
-     */
-    ver : null,
-    /** Function: init
-     * Plugin init
-     *
-     * Parameters:
-     *   (Strophe.Connection) conn - Strophe connection
-     */
-    init: function(conn)
-    {
-	this._connection = conn;
-        this.items = [];
-        // Presence subscription
-        conn.addHandler(this._onReceivePresence.bind(this), null, 'presence', null, null, null);
-        conn.addHandler(this._onReceiveIQ.bind(this), Strophe.NS.ROSTER, 'iq', "set", null, null);
+(function() {
+    Strophe.addConnectionPlugin('roster', (function() {
+	var that, init, connection, callbacks, version, logger, contacts, on_presence, on_iq, on_message, get_contact, parse_query, parse_contact, fetch, subscribe, unsubscribe, authorize, unauthorize, update_contact, set_callbacks, supports_versioning, status_changed;
 
-        Strophe.addNamespace('ROSTER_VER', 'urn:xmpp:features:rosterver');
-    },
-    /** Function: supportVersioning
-     * return true if roster versioning is enabled on server
-     */
-    supportVersioning: function()
-    {
-        return (this._connection.features && this._connection.features.getElementsByTagName('ver').length > 0);
-    },
-    /** Function: get
-     * Get Roster on server
-     *
-     * Parameters:
-     *   (Function) userCallback - callback on roster result
-     *   (String) ver - current rev of roster
-     *      (only used if roster versioning is enabled)
-     *   (Array) items - initial items of ver
-     *      (only used if roster versioning is enabled)
-     *     In browser context you can use sessionStorage
-     *     to store your roster in json (JSON.stringify())
-     */
-    get: function(userCallback, ver, items)
-    {
-        var attrs = {xmlns: Strophe.NS.ROSTER};
-        this.items = [];
-        if (this.supportVersioning())
-        {
-            // empty rev because i want an rev attribute in the result
-            attrs.ver = ver || '';
-            this.items = items || [];
-        }
-        var iq = $iq({type: 'get',  'id' : this._connection.getUniqueId('roster')}).c('query', attrs);
-        this._connection.sendIQ(iq,
-                                this._onReceiveRosterSuccess.bind(this).prependArg(userCallback),
-                                this._onReceiveRosterError.bind(this).prependArg(userCallback));
-    },
-    /** Function: registerCallback
-     * register callback on roster (presence and iq)
-     *
-     * Parameters:
-     *   (Function) call_back
-     */
-    registerCallback: function(call_back)
-    {
-        this._callbacks.push(call_back);
-    },
-    /** Function: findItem
-     * Find item by JID
-     *
-     * Parameters:
-     *     (String) jid
-     */
-    findItem : function(jid)
-    {
-        for (var i = 0; i < this.items.length; i++)
-        {
-            if (this.items[i].jid == jid)
-            {
-                return this.items[i];
+	// A logger which uses the Firebug 'console'
+	logger =  {
+	    debug: function(msg) {
+		if (typeof(console) !== 'undefined') {
+		    console.debug('strophe.roster: ');
+		    console.debug(msg);
+		}
+	    },
+	    info: function(msg) {
+		if (typeof(console) !== 'undefined') {
+		    console.info('strophe.roster: ' + msg);
+		}
+	    },
+	    error: function(msg) {
+		if (typeof(console) !== 'undefined') {
+		    console.error('strophe.roster: ' + msg);
+		}
+	    }
+	};
+
+	/**
+	 * Group: Callbacks
+	 */
+	callbacks = {};
+
+	/**
+	 * Callback: presence_subscription_request
+	 *
+	 * Invoked when a subscription request is received
+	 */
+	callbacks.presence_subscription_request = function() {};
+
+	/**
+	 * Callback: contact_changed
+	 * 
+	 * Invoked when a contact has their details changed and needs to be re-drawn
+	 */
+	callbacks.contact_changed = function(contact) {};
+
+	/**
+	 * Group: Functions
+	 */
+
+	/**
+	 * Function: set_callbacks
+	 * 
+	 * Overrides the default callbacks if they are specified.
+	 */
+	set_callbacks = function(callbks) {
+	    if (typeof(callbks) !== 'undefined') {
+		if (typeof(callbks.presence_subscription_request) !== 'undefined') {
+		    logger.info("Overriding presence_subscription_request callback");
+		    callbacks.presence_subscription_request = callbks.presence_subscription_request;
+		}
+		if (typeof(callbks.contact_changed) !== 'undefined') {
+		    logger.info("Overriding contact_changed callback");
+		    callbacks.contact_changed = callbks.contact_changed;
+		}
+	    }
+	};
+
+	/**
+	 * Function: get_contact
+	 *
+	 * Returns a contact matching the specified jid
+	 *
+	 * Parameters:
+	 * jid - The Jabber identifier of the contact
+	 *
+	 * Returns: 
+	 * {
+	 *   jid: '',
+	 *   resources: [],
+	 *   nickname: '',
+	 *   avatar: {
+	 *     url: '',
+	 *     data: ''
+         *   }
+	 * }
+	 */
+	get_contact = function(jid) {
+	    var index; 
+	    for (index = 0; index < contacts.length; index = index + 1) {
+		if (contacts[index].jid === jid) {
+		    return contacts[index];
+		}
+	    }
+	    return false;
+	};
+
+	status_changed = function(status) {
+	    if (status === Strophe.Status.CONNECTED) {
+		// Bind to event handlers
+		connection.addHandler(on_presence, null, 'presence', null, null, null);
+		connection.addHandler(on_iq, Strophe.NS.ROSTER, 'iq', "set", null, null);
+		connection.addHandler(on_message, null, 'message', null, null, null);
+		fetch();
+	    } else if (status === Strophe.Status.DISCONNECTED) {
+		// Remove any of the resources associated to all contacts
+		(function() {
+		    var index; 
+		    for (index = 0; index < contacts.length; index = index + 1) {
+			contacts[index].resources = [];
+		    }	
+		}());
+	    }
+	};
+
+	/**
+	 * PrivateFunction: on_presence
+	 *
+	 * Strophe callback invoked on a 'presence' message
+	 */
+	on_presence = function(presence) {
+	    var jid, from, contact;
+	    jid = presence.getAttribute('from');
+	    from = Strophe.getBareJidFromJid(jid);
+	    type = presence.getAttribute('type');
+	    contact = get_contact(from);
+	    if (contact) {		
+		if (type === 'unavailable') {
+		    logger.info('Removing resource ' + Strophe.getResourceFromJid(jid) + ' from ' + from);
+		    // Remove the resource from the contact
+		    delete contact.resources[Strophe.getResourceFromJid(jid)];
+		    // Update the available attribute
+		    contact.available = (function(resources) {
+			var k, count;
+			for (k in resources) {
+			    if (resources.hasOwnProperty(k)) {
+				count = count + 1;
+			    }
+			}
+			return count > 0;
+		    }(contact.resources));
+		} else {
+		    logger.info('Adding resource ' + Strophe.getResourceFromJid(jid) + '  to ' + from);
+		    contact.resources[Strophe.getResourceFromJid(jid)] = {
+			show : (presence.getElementsByTagName('show').length != 0) ? Strophe.getText(presence.getElementsByTagName('show')[0]) : "",
+			status   : (presence.getElementsByTagName('status').length != 0) ? Strophe.getText(presence.getElementsByTagName('status')[0]) : "",
+			priority : (presence.getElementsByTagName('priority').length != 0) ? Strophe.getText(presence.getElementsByTagName('priority')[0]) : ""	
+		    };
+		    contact.available = true;
+		}
+	    } else {
+		// The contact is not part of the roster
+		if (type === 'subscribe') {
+		    callbacks.presence_subscription_request(jid);
+		} else {
+		    contact = {
+			jid: from,
+			name: from,
+			resources: [],
+			groups: [],
+			available: true
+		    };
+		    contact.resources[Strophe.getResourceFromJid(jid)] = {
+			show: '',
+			status: '',
+			priority: ''
+		    };
+		    contacts.push(contact);
+		    logger.info('Invoking contact_changed callback');
+		    callbacks.contact_changed(contact);
+		}
+	    }
+	    
+	    return true;
+	};
+
+	/**
+	 * PrivateFunction: on_iq
+	 *
+	 * Strophe callback invoked on a 'iq' message
+	 */
+	on_iq = function(iq) {
+	    connection.send($iq({type: 'result', id: iq.id, to: iq.from}));
+	    parse_query(iq);
+	    return true;
+	};
+
+	/**
+	 * PrivateFunction: on_message
+	 *
+	 * Strophe callback invoked on a 'message' stanza.
+	 */
+	on_message = function(stanza) {
+	    var jid, contact, nick, nickname;
+	    jid = stanza.getAttribute('from');
+	    contact = connection.roster.get_contact(jid);
+	    if (contact) {
+		nick = stanza.getElementsByTagName('nick');
+		if (nick.length === 1) {
+		    contact.nickname = Strophe.getText(nick[0]);
+		    logger.info("Invoking contact_changed callback");
+		    callbacks.contact_changed(contact);
+		} 
+		
+	    }
+	    return true;
+	};
+
+	/**
+	 * PrivateFunction: parse_query
+
+	 */
+	parse_query = function(iq) {
+	    var query, items;
+	    query = iq.getElementsByTagName('query');
+            if (query.length != 0) {
+		version = query.item(0).getAttribute('ver');
+		
+		Strophe.forEachChild(query.item(0), 'item', function(item) {
+		    parse_contact(item);
+		});
             }
-        }
-        return false;
-    },
-    /** Function: subscribe
-     * Subscribe presence
-     *
-     * Parameters:
-     *     (String) jid
-     */
-    subscribe: function(jid)
-    {
-        this._connection.send($pres({to: jid, type: "subscribe"}));
-    },
-    /** Function: unsubscribe
-     * Unsubscribe presence
-     *
-     * Parameters:
-     *     (String) jid
-     */
-    unsubscribe: function(jid)
-    {
-        this._connection.send($pres({to: jid, type: "unsubscribe"}));
-    },
-    /** Function: authorize
-     * Authorize presence subscription
-     *
-     * Parameters:
-     *     (String) jid
-     */
-    authorize: function(jid)
-    {
-        this._connection.send($pres({to: jid, type: "subscribed"}));
-    },
-    /** Function: unauthorize
-     * Unauthorize presence subscription
-     *
-     * Parameters:
-     *     (String) jid
-     */
-    unauthorize: function(jid)
-    {
-        this._connection.send($pres({to: jid, type: "unsubscribed"}));
-    },
-    /** Function: update
-     * Update roster item
-     *
-     * Parameters:
-     *   (String) jid - item jid
-     *   (String) name - name
-     *   (Array) groups
-     *   (Function) call_back
-     */
-    update: function(jid, name, groups, call_back)
-    {
-        var item = this.findItem(jid);
-        if (!item)
-        {
-            throw "item not found";
-        }
-        var newName = name || item.name;
-        var newGroups = groups || item.groups;
-        var iq = $iq({type: 'set'}).c('query', {xmlns: Strophe.NS.ROSTER}).c('item', {jid: item.jid,
-                                                                                      name: newName,
-                                                                                      subscription: item.subscription});
-        for (var i = 0; i < newGroups.length; i++)
-        {
-            iq.c('group').t(newGroups[i]).up();
-        }
-        this._connection.sendIQ(iq, call_back, call_back);
-    },
-    /** PrivateFunction: _onReceiveRosterSuccess
-     *
-     */
-    _onReceiveRosterSuccess: function(userCallback, stanza)
-    {
-        this._updateItems(stanza);
-        userCallback(this.items);
-    },
-    /** PrivateFunction: _onReceiveRosterError
-     *
-     */
-    _onReceiveRosterError: function(userCallback, stanza)
-    {
-        userCallback(this.items);
-    },
-    /** PrivateFunction: _onReceivePresence
-     * Handle presence
-     */
-    _onReceivePresence : function(presence)
-    {
-        // TODO: from is optional
-        var jid = presence.getAttribute('from');
-        var from = Strophe.getBareJidFromJid(jid);
-        var item = this.findItem(from);
-        // not in roster
-        if (!item)
-        {
-            return true;
-        }
-        var type = presence.getAttribute('type');
-        if (type == 'unavailable')
-        {
-            delete item.resources[Strophe.getResourceFromJid(jid)];
-        }
-        else
-        {
-            // TODO: add timestamp
-            item.resources[Strophe.getResourceFromJid(jid)] = {
-                show     : (presence.getElementsByTagName('show').length != 0) ? Strophe.getText(presence.getElementsByTagName('show')[0]) : "",
-                status   : (presence.getElementsByTagName('status').length != 0) ? Strophe.getText(presence.getElementsByTagName('status')[0]) : "",
-                priority : (presence.getElementsByTagName('priority').length != 0) ? Strophe.getText(presence.getElementsByTagName('priority')[0]) : ""
-            };
-        }
-        this._call_backs(this.items, item);
-        return true;
-    },
-    /** PrivateFunction: _call_backs
-     *
-     */
-    _call_backs : function(items, item)
-    {
-        for (var i = 0; i < this._callbacks.length; i++) // [].forEach my love ...
-        {
-            this._callbacks[i](items, item);
-        }
-    },
-    /** PrivateFunction: _onReceiveIQ
-     *
-     */
-    _onReceiveIQ : function(iq)
-    {
-        var id = iq.id;
-        var from = iq.from;
-        var iqresult = $iq({type: 'result', id: id, to: from});
-        this._connection.send(iqresult);
-        this._updateItems(iq);
-        return true;
-    },
-    /** PrivateFunction: _updateItems
-     * Update items from iq
-     */
-    _updateItems : function(iq)
-    {
-        var query = iq.getElementsByTagName('query');
-        if (query.length != 0)
-        {
-            this.ver = query.item(0).getAttribute('ver');
-            var self = this;
-            Strophe.forEachChild(query.item(0), 'item',
-                function (item)
-                {
-                    self._updateItem(item);
-                }
-           );
-        }
-        this._call_backs(this.items);
-    },
-    /** PrivateFunction: _updateItem
-     * Update internal representation of roster item
-     */
-    _updateItem : function(item)
-    {
-        var jid           = item.getAttribute("jid");
-        var name          = item.getAttribute("name");
-        var subscription  = item.getAttribute("subscription");
-        var groups        = [];
-        Strophe.forEachChild(item, 'group',
-            function(group)
-            {
-                groups.push(Strophe.getText(group));
+	};
+
+	parse_contact = function(item) {
+	    var jid, name, subscription, groups;
+	    jid = item.getAttribute("jid");
+            name = item.getAttribute("name");
+            subscription = item.getAttribute("subscription");
+            groups = [];
+            
+	    Strophe.forEachChild(item, 'group', function(group) {
+		groups.push(Strophe.getText(group));
+	    });
+	    
+            var item = get_contact(jid);
+            if (!item) {
+		logger.info("Adding contact " + jid);
+		item = {
+                    name         : name,
+                    jid          : jid,
+                    subscription : subscription,
+                    groups       : groups,
+                    resources    : {},
+		    available    : false
+		};
+		contacts.push(item);
+            } else {
+		logger.info("Updating existing contact");
+		item.name = name;
+		item.subscription = subscription;
+		item.groups = groups;
             }
-        );
+	    logger.info("Invoking contact_changed callback");
+	    callbacks.contact_changed(item);
+	};
+	
+	/**
+	 * Function: init
+	 *
+	 * Constructor for Strophe plugin
+	 */
+	init = function(conn) {
+	    connection = conn;
+	    version = 'unknown';
+	    contacts = [];
 
-        var item = this.findItem(jid);
-        if (!item)
-        {
-			item = {
-                name         : name,
-                jid          : jid,
-                subscription : subscription,
-                groups       : groups,
-                resources    : {}
-            };
+            Strophe.addNamespace('ROSTER_VER', 'urn:xmpp:features:rosterver');
+	};
 
-            this.items.push(item);
-        }
-        else
-        {
-            item.name = name;
-            item.subscription = subscription;
-            item.group = groups;
-        }
-		this._call_backs( this.items, item );
-    }
-});
+	/**
+	 * Function: update_contact
+	 *
+	 * Updates the details of a contact
+	 */
+	update_contact = function(jid, name, groups) {
+	    var contact, iq;
+	    contact = get_contact(jid);
+	    if (contact) {
+		var iq = $iq({
+		    type: 'set'
+		}).c('query', {
+		    xmlns: Strophe.NS.ROSTER
+		}).c('item', {
+		    jid: contact.jid,
+                    name: name || item.name,
+                    subscription: item.subscription
+		});
+		for (var i = 0; i < (groups || item.groups).length; i++) {
+		    iq.c('group').t((groups || item.groups)[i]).up();
+		}
+		connection.sendIQ(iq);
+	    };
+	};
+
+	/**
+	 * Function: fetch
+	 * 
+	 * Retrieves a list of contacts from the server
+	 */
+	fetch = function() {
+	    logger.info("Fetching contacts");
+            connection.sendIQ($iq({
+		type: 'get',
+		'id' : connection.getUniqueId('roster')
+	    }).c('query', {
+		xmlns: Strophe.NS.ROSTER
+	    }), function(stanza) {
+		parse_query(stanza);
+	    });
+	};
+
+	/** 
+	 * Function: subscribe
+	 *
+	 * Subscribe presence
+	 *
+	 * Parameters:
+	 *     (String) jid
+	 */
+	subscribe = function(jid) {
+            connection.send($pres({to: jid, type: "subscribe"}));
+	};
+	
+	/** 
+	 * Function: unsubscribe
+	 *
+	 * Unsubscribe presence
+	 *
+	 * Parameters:
+	 *     (String) jid
+	 */
+	unsubscribe = function(jid) {
+            connection.send($pres({to: jid, type: "unsubscribe"}));
+	};
+	
+	/** 
+	 * Function: authorize
+	 *
+	 * Authorize presence subscription
+	 *
+	 * Parameters:
+	 *     (String) jid
+	 */
+	authorize = function(jid) {
+            connection.send($pres({to: jid, type: "subscribed"}));
+	};
+	
+	/** 
+	 * Function: unauthorize
+	 *
+	 * Unauthorize presence subscription
+	 *
+	 * Parameters:
+	 *     (String) jid
+	 */
+	unauthorize = function(jid) {
+            connection.send($pres({to: jid, type: "unsubscribed"}));
+	};
+
+	/** 
+	 * Function: supportVersioning
+	 * return true if roster versioning is enabled on server
+	 */
+	supports_versioning = function() {
+            return (connection.features && connection.features.getElementsByTagName('ver').length > 0);
+	}
+
+
+	that = {};
+	that.init = init;
+	that.set_callbacks = set_callbacks;
+	that.get_contact = get_contact;
+	that.fetch = fetch;
+	that.unauthorize = unauthorize;
+	that.authorize = authorize;
+	that.unsubscribe = unsubscribe;
+	that.subscribe = subscribe;
+	that.update_contact = update_contact;
+	that.supports_versioning = supports_versioning;
+	that.statusChanged = status_changed;
+	that.callbacks = callbacks;
+	return that;
+    }()))
+}());

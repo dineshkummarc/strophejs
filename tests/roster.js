@@ -1,33 +1,5 @@
-/**
- * Transform an object prototype to array
- * Usefull for jack
- * TODO: implement it on Jack
- */
-function object2Array(object) {
-    var a = [];
-    for (var i in object.prototype) {
-        if (typeof object.prototype[i] == "function") {
-            a.push(i);
-        }
-    }
-    return a;
-}
 
-function toDom(string)
-{
-    if (window.DOMParser)
-    {
-        var parser = new DOMParser();
-        return parser.parseFromString(string, "text/xml").documentElement;
-    }
-    else // Internet Explorer
-    {
-        var parser = new ActiveXObject("Microsoft.XMLDOM");
-        parser.async = "false";
-        parser.loadXML(string);
-        return parser.documentElement;
-    }
-}
+
 var rosterPlugin = Strophe._connectionPlugins["roster"];
 module("plugins.Roster", {
            setup: function() {
@@ -42,27 +14,14 @@ module("plugins.Roster", {
 
 // shortcut access
 
-// Qunit test with jack for mocking facility
-function jackTest(name, fun) {
-    test(name,
-         function() {
-             jack(
-                 function() {
-                     var mockConnection = jack.create("mockConnection", object2Array(Strophe.Connection));
-                     fun(mockConnection);
-                 }
 
-             );
-         }
-        );
-}
 
-jackTest("roster.get() should send IQ",
+jackTest("roster.fetch() should send IQ",
          function (mockConnection) {
              jack.expect("mockConnection.sendIQ")
                  .once();
              rosterPlugin.init(mockConnection);
-             rosterPlugin.get("callback");
+             rosterPlugin.fetch("callback");
          });
 
 jackTest("roster.get() should callback with empty array",
@@ -75,13 +34,14 @@ jackTest("roster.get() should callback with empty array",
                      }
                  );
              rosterPlugin.init(mockConnection);
-             rosterPlugin.get(
-                 function(items) {
-                     called++;
-                     equals(items.length, 0, "items must be empty");
-                 }
-             );
-             equals(called, 1, "roster.get() callback should be called");
+	     rosterPlugin.set_callbacks({
+		 presence_changed: function() {
+		     console.debug("BOOM " + called);
+		     called ++;
+		 }
+	     });
+             rosterPlugin.fetch();
+             equals(called, 0, "roster.get() callback should be called");
          });
 /**
  *  Test stanza came from RFC 3921 XMPP-IM
@@ -111,19 +71,21 @@ jackTest("roster.get() should callback with roster items",
                      }
                  );
              rosterPlugin.init(mockConnection);
-             rosterPlugin.get(
-                 function(items) {
-                     called++;
+	     rosterPlugin.set_callbacks({
+		 presence_changed: function(contact) {
+		     called++;
+		     if (called == 1) {
                      equals(null, rosterPlugin.ver);
-                     equals(items.length, 3, "3 items");
-                     equals(Strophe._connectionPlugins["roster"].items.length, 3, "3 items");
-                     equals(items[0].name, "Romeo");
-                     equals(items[0].jid, "romeo@example.net");
-                     equals(items[0].subscription, "both");
-                     equals(items[0].groups.length, 1);
-                     equals(items[0].groups[0], 'Friends');
-                 });
-             equals(called, 1, "roster.get() callback should be called");
+                     equals(contact.name, "Romeo");
+                     equals(contact.jid, "romeo@example.net");
+                     equals(contact.subscription, "both");
+                     equals(contact.groups.length, 1);
+                     equals(contact.groups[0], 'Friends');
+		     }
+		 }
+	     });
+             rosterPlugin.fetch();
+             equals(called, 3, "roster.fetch() callback should be called");
          });
 
 function getFeatures(rosterver)
@@ -135,14 +97,14 @@ jackTest("roster plugin say if roster versioning is enabled",
         function(mockConnection) {
             mockConnection.features = getFeatures(true);
             rosterPlugin.init(mockConnection);
-            equals(true, rosterPlugin.supportVersioning(), "roster versioning should be enabled");
+            equals(true, rosterPlugin.supports_versioning(), "roster versioning should be enabled");
         });
 
 jackTest("roster plugin say if roster versioning is not enabled",
         function(mockConnection) {
             mockConnection.features = getFeatures(false);
             rosterPlugin.init(mockConnection);
-            equals(false, rosterPlugin.supportVersioning(), "roster versioning should be enabled");
+            equals(false, rosterPlugin.supports_versioning(), "roster versioning should be enabled");
         });
 
 jackTest("roster.get() send ver if server support versioning",
@@ -157,7 +119,7 @@ jackTest("roster.get() send ver if server support versioning",
                  );
              mockConnection.features = getFeatures(true);
              rosterPlugin.init(mockConnection);
-             rosterPlugin.get(
+             rosterPlugin.fetch(
                  function(items) {
                      called++;
                      equals(0, items.length);
@@ -177,7 +139,7 @@ jackTest("roster.get() send specified ver if server support versioning",
                  );
              mockConnection.features = getFeatures(true);
              rosterPlugin.init(mockConnection);
-             rosterPlugin.get(
+             rosterPlugin.fetch(
                  function(items) {
                      called++;
                      equals(1, items.length);
@@ -196,7 +158,7 @@ jackTest("roster.get() accept ver and item arg and server return entire roster",
                  );
              mockConnection.features = getFeatures(true);
              rosterPlugin.init(mockConnection);
-             rosterPlugin.get(
+             rosterPlugin.fetch(
                  function(items) {
                      called++;
                      equals(items.length, 1);
@@ -288,7 +250,7 @@ jackTest("roster should be updated when received iq and update callback called",
                      	calledWithItem++;
                      }
                  });
-             rosterPlugin.get(function() {});
+             rosterPlugin.fetch(function() {});
              ok(callbackIq(toDom('<iq type="set"><query xmlns="jabber:iq:roster">'
                            + '<item jid="romeo@example.net" '
                            + 'name="Romeo" '
@@ -324,7 +286,7 @@ jackTest("roster should be handle presence of roster contact and update callback
                                          + '</item></query></iq>'));
                      });
              rosterPlugin.init(mockConnection);
-             rosterPlugin.get(function() {});
+             rosterPlugin.fetch(function() {});
              var called = 0;
              rosterPlugin.registerCallback(
                  function(items, item) {
@@ -365,7 +327,7 @@ jackTest("roster should be handle presence unavailable",
                                          + '</item></query></iq>'));
                      });
              rosterPlugin.init(mockConnection);
-             rosterPlugin.get(function() {});
+             rosterPlugin.fetch(function() {});
              same({}, rosterPlugin.items[0].resources);
              ok(callbackPresence(toDom('<presence from="romeo@example.net/orchard"><show>xa</show><status>Test</status><priority>42</priority></presence>')), "handler should return true");
              equals(rosterPlugin.items[0].resources['orchard'].show, "xa");
