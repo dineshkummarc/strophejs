@@ -9,3 +9,4 @@ plugins/*.min.js
 *.zip
 *~
 vendor
+target

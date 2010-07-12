@@ -1,0 +1,123 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    
+
+    <groupId>com.soashable.vendor.strophejs</groupId>
+    <artifactId>strophejs</artifactId>
+    <packaging>javascript</packaging>
+	<version>1.0.1-SNAPSHOT</version>
+
+    <name>strophejs</name>
+	<description>strophejs</description>
+    <url>http://github.com/owengriffen/strophejs</url>
+	<licenses>
+		<license>
+			<name>MIT</name>
+			<url>MIT-LICENSE.txt</url>
+		</license>
+	</licenses>
+
+
+    <dependencies>
+    </dependencies>
+
+	<scm>
+        <connection>scm:git:git://github.com/owengriffen/strophejs.git</connection>
+        <url>http://github.com/owengriffen/strophejs</url>
+	</scm>
+
+	<developers>
+		<!-- 
+			... rest of strophejs team ...
+		-->
+		<developer>
+			<id>harlanji</id>
+			<name>Harlan Iverson</name>
+			<email>h.iverson@gmail.com</email>
+		</developer>
+	</developers>
+
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.codehaus.mojo.javascript</groupId>
+				<artifactId>javascript-maven-plugin</artifactId>
+				<extensions>true</extensions>
+				<configuration>
+					<sourceDirectory>.</sourceDirectory>
+				</configuration>
+			</plugin>
+			<plugin>
+				<artifactId>maven-antrun-plugin</artifactId>
+				<version>1.4</version>
+				<executions>
+					<execution>
+						<phase>process-resources</phase>
+						<configuration>
+							<tasks>
+								<exec executable="make">
+									<arg value="all"/>
+								</exec>
+							</tasks>
+						</configuration>
+						<goals>
+							<goal>run</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+		</plugins>
+	</build>
+
+	<profiles>
+		<profile>
+			<id>release-sonatype-oss</id>
+
+			<activation>
+				<activeByDefault>true</activeByDefault>
+			</activation>
+		
+			<distributionManagement>
+				<repository>
+					<id>sonatype-oss-staging</id>
+					<url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+				</repository>
+				<snapshotRepository>
+					<id>sonatype-oss-snapshots</id>
+					<url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+				</snapshotRepository>
+			</distributionManagement>
+		</profile>
+
+		<profile>
+			<id>release-sign-artifacts</id>
+			<activation>
+				<property>
+				<name>performRelease</name>
+					<value>true</value>
+				</property>
+			</activation>
+
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-gpg-plugin</artifactId>
+						<executions>
+							<execution>
+								<id>sign-artifacts</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>sign</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+
+</project>
