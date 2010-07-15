@@ -9,7 +9,7 @@
 
     <name>strophejs</name>
 	<description>strophejs</description>
-    <url>http://github.com/owengriffen/strophejs</url>
+    <url>http://github.com/owengriffin/strophejs</url>
 	<licenses>
 		<license>
 			<name>MIT</name>
@@ -22,8 +22,8 @@
     </dependencies>
 
 	<scm>
-        <connection>scm:git:git://github.com/owengriffen/strophejs.git</connection>
-        <url>http://github.com/owengriffen/strophejs</url>
+        <connection>scm:git:git://github.com/owengriffin/strophejs.git</connection>
+        <url>http://github.com/owengriffin/strophejs</url>
 	</scm>
 
 	<developers>
