@@ -67,7 +67,7 @@ end
 DEPENDENCIES = Hash.new
 DEPENDENCIES[:test] = VENDOR[:test].map { |key, value| "vendor/#{value[:file]}" }
 DEPENDENCIES[:main] = VENDOR[:main].map { |key, value| "vendor/#{value[:file]}" }
-DEPENDENCIES[:all] = DEPENDENCIES[:main] + DEPENDENCIES[:test]
+DEPENDENCIES[:all] = DEPENDENCIES[:test] + DEPENDENCIES[:main]
 
 def execute_test(command, filename)
   cmd = ""
