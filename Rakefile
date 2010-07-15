@@ -23,7 +23,7 @@ file rhino[:jar] => [rhino[:zip]] do
 end
 
 SRC = FileList["src/*.js"]
-TEST = FileList["tests/*.js"]
+TEST = FileList["tests/*.js"].exclude("all.js")
 PLUGINS = FileList["plugins/*.js"]
 LIB = Hash.new
 LIB[:test] = FileList["tests/lib/*.js"]
