@@ -70,12 +70,13 @@ DEPENDENCIES[:main] = VENDOR[:main].map { |key, value| "vendor/#{value[:file]}" 
 DEPENDENCIES[:all] = DEPENDENCIES[:test] + DEPENDENCIES[:main]
 
 def execute_test(command, filename)
-  cmd = ""
-  (DEPENDENCIES[:all] + LIB[:test] + SRC + PLUGINS + [filename]).each do |f|
-    cmd << "load('#{f}');"
+  File.open(filename + ".test.js", "w") do |fh|
+    (DEPENDENCIES[:all] + LIB[:test] + SRC + PLUGINS + [filename]).each do |f|
+      fh.puts "load('#{f}');"
+    end
+    fh.puts "window.location = '';"
   end
-  cmd << "window.location = '';"
-  sh "echo \"#{cmd}\" | " + command   
+  sh command + " " + filename + ".test.js"
 end
 
 task :test_file, [:filename] do |t, args|
