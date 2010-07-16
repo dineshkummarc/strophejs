@@ -38,8 +38,10 @@ task("qunit", ["vendor", "jquery"], function() {
     os.system('wget -q -O vendor/qunit.css http://github.com/jquery/qunit/raw/master/qunit/qunit.css');
 });
 
+task("jquery-xmlns", ["vendor"], function() {
+    os.system('wget -q -O vendor/jquery.xmlns.js http://www.rfk.id.au/static/scratch/jquery.xmlns.js');    
+});
 
-
-task("test", ["qunit"]);
+task("test", ["qunit", "jquery-xmlns"]);
 
 task("default", ["strophe.js"]);
