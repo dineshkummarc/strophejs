@@ -8,3 +8,4 @@ plugins/*.min.js
 *.tar.gz
 *.zip
 *~
+vendor
