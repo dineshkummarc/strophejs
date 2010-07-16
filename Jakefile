@@ -1,11 +1,11 @@
 var jake = require('jake'),
     shrinksafe = require('minify/shrinksafe'),
-    read = require('file').read,
-    write = require('file').write,
+file = require('file'),
     system = require('system'),
     filedir = require("jake").filedir,
     task = require("jake").task,
 clean = require('jake/clean'),
+os = require('os'),
     FileList = require("jake").FileList;
 
 clean.CLEAN.include('**/#*#', '\.#*' , '**/\.tmp*',"**/\.*\.*\.swp");
@@ -19,10 +19,27 @@ filedir("strophe.js", new FileList("src/*.js"), function()
 
     (new FileList("src/*.js")).forEach(function(filename)
     {
-        result += shrinksafe.compress(read(filename));
+        result += shrinksafe.compress(file.read(filename));
     });
 
-    write("strophe.js", result);
+    file.write("strophe.js", result);
 });
+
+filedir("vendor", function() {
+    file.mkdirs("vendor");
+});
+
+task("jquery", ["vendor"], function() {
+    os.system("wget -q -O vendor/jquery.js http://code.jquery.com/jquery-latest.js");
+});
+
+task("qunit", ["vendor", "jquery"], function() {
+    os.system('wget -q -O vendor/qunit.js http://github.com/jquery/qunit/raw/master/qunit/qunit.js');
+    os.system('wget -q -O vendor/qunit.css http://github.com/jquery/qunit/raw/master/qunit/qunit.css');
+});
+
+
+
+task("test", ["qunit"]);
 
 task("default", ["strophe.js"]);
