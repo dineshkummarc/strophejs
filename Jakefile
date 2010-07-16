@@ -5,7 +5,13 @@ var jake = require('jake'),
     system = require('system'),
     filedir = require("jake").filedir,
     task = require("jake").task,
+clean = require('jake/clean'),
     FileList = require("jake").FileList;
+
+clean.CLEAN.include('**/#*#', '\.#*' , '**/\.tmp*',"**/\.*\.*\.swp");
+clean.CLEAN.exclude('\.git');    //don't touch my .git directory!
+clean.CLEAN.include('strophe.js');
+
 
 filedir("strophe.js", new FileList("src/*.js"), function()
 {
