@@ -368,7 +368,6 @@ Modified by Owen Griffin
             return (connection.features && connection.features.getElementsByTagName('ver').length > 0);
 	}
 
-
 	that = {};
 	that.init = init;
 	that.set_callbacks = set_callbacks;
